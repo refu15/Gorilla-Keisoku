@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI活用度測定 - Gorilla Keisoku | 日報作成アシスタント</title>
+    <meta name="description" content="Googleカレンダーから日報を自動生成し、各予定のAI活用度を記録するChrome拡張機能。チームのAI活用状況を可視化し、業務効率化を支援します。">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%236366f1'/><path d='M20 32L28 40L44 24' stroke='white' stroke-width='4' fill='none'/></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+                    <circle cx="32" cy="32" r="30" fill="url(#g1)" />
+                    <path d="M20 32L28 40L44 24" stroke="white" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <defs>
+                        <linearGradient id="g1" x1="0" y1="0" x2="64" y2="64">
+                            <stop offset="0%" stop-color="#6366f1" />
+                            <stop offset="100%" stop-color="#8b5cf6" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                Gorilla Keisoku
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">機能</a></li>
+                <li><a href="#how-it-works">使い方</a></li>
+                <li><a href="privacy.html">プライバシー</a></li>
+                <li><a href="terms.html">利用規約</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content animate-in">
+            <div class="hero-badge">🦍 Chrome Extension</div>
+            <h1>
+                AI活用度を<br>
+                <span class="gradient-text">見える化</span>する
+            </h1>
+            <p>
+                Googleカレンダーから日報を自動生成し、<br>
+                各予定のAI活用度を記録。チームの業務効率化を加速します。
+            </p>
+            <div class="hero-actions">
+                <a href="https://github.com/refu15/Gorilla-Keisoku" class="btn btn-primary" target="_blank">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    GitHub で見る
+                </a>
+                <a href="#features" class="btn btn-secondary">
+                    機能を見る →
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+        <div class="section-header">
+            <h2>主な機能</h2>
+            <p>AI活用度の測定から分析レポートまで、業務効率化に必要なすべてを提供</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card animate-in animate-delay-1">
+                <span class="feature-icon">📅</span>
+                <h3>Googleカレンダー連携</h3>
+                <p>当日の予定を自動取得。複数カレンダーに対応し、チェックボックスで対象予定を絞り込めます。</p>
+            </div>
+            <div class="feature-card animate-in animate-delay-2">
+                <span class="feature-icon">🤖</span>
+                <h3>AI活用度記録</h3>
+                <p>各予定に対してAI活用有無と活用率を記録。自動推定機能でキーワードベースの初期判定も行います。</p>
+            </div>
+            <div class="feature-card animate-in animate-delay-3">
+                <span class="feature-icon">📊</span>
+                <h3>ダッシュボード</h3>
+                <p>日別・週別・月別のサマリーを表示。AI活用時間の推移グラフとカレンダー別ランキングで傾向を把握。</p>
+            </div>
+            <div class="feature-card animate-in animate-delay-4">
+                <span class="feature-icon">✨</span>
+                <h3>Gemini AIレポート</h3>
+                <p>Gemini APIを活用し、週次・月次のAI活用レポートを自動生成。具体的な改善提案を受けられます。</p>
+            </div>
+            <div class="feature-card animate-in animate-delay-1">
+                <span class="feature-icon">📝</span>
+                <h3>スプレッドシート保存</h3>
+                <p>日報データをGoogleスプレッドシートへワンクリック保存。DailySummary・WeeklyReport・MonthlyReportを自動管理。</p>
+            </div>
+            <div class="feature-card animate-in animate-delay-2">
+                <span class="feature-icon">🔄</span>
+                <h3>定期レポート自動生成</h3>
+                <p>chrome.alarmsにより、毎週月曜・毎月1日にレポートを自動生成。通知でお知らせします。</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="section" id="how-it-works">
+        <div class="section-header">
+            <h2>使い方</h2>
+            <p>3ステップでAI活用度の記録を開始</p>
+        </div>
+        <div class="steps">
+            <div class="step animate-in animate-delay-1">
+                <div class="step-number">1</div>
+                <h3>インストール</h3>
+                <p>GitHubからソースを取得し、Chrome拡張として読み込み。Google Cloud設定で認証を有効化。</p>
+            </div>
+            <div class="step animate-in animate-delay-2">
+                <div class="step-number">2</div>
+                <h3>予定を確認</h3>
+                <p>サイドパネルを開くと当日の予定が自動表示。各予定のAI活用度をスライダーで記録。</p>
+            </div>
+            <div class="step animate-in animate-delay-3">
+                <div class="step-number">3</div>
+                <h3>日報を送信</h3>
+                <p>ワンクリックでスプレッドシートに保存。ダッシュボードで推移を確認し、AIレポートで改善。</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <h2>AI活用度の可視化を始めよう</h2>
+        <p>チームの業務効率化を次のレベルへ</p>
+        <a href="https://github.com/refu15/Gorilla-Keisoku" class="btn btn-primary" target="_blank">
+            GitHub リポジトリ →
+        </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-links">
+                <a href="/">ホーム</a>
+                <a href="privacy.html">プライバシーポリシー</a>
+                <a href="terms.html">利用規約</a>
+                <a href="https://github.com/refu15/Gorilla-Keisoku" target="_blank">GitHub</a>
+            </div>
+            <p class="footer-copy">&copy; 2026 Gorilla Keisoku. All rights reserved.</p>
+        </div>
+    </footer>
+
+</body>
+
+</html>

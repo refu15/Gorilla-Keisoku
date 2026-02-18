@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI活用度測定 - 日報作成</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="lib/chart.umd.min.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <!-- ログイン画面 -->
+    <div id="login-screen" class="screen">
+      <div class="login-card">
+        <div class="logo">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="30" fill="url(#gradient1)" />
+            <path d="M20 32L28 40L44 24" stroke="white" stroke-width="4" stroke-linecap="round"
+              stroke-linejoin="round" />
+            <defs>
+              <linearGradient id="gradient1" x1="0" y1="0" x2="64" y2="64">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="100%" stop-color="#8b5cf6" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1>AI活用度測定</h1>
+        <p class="subtitle">Googleカレンダーから日報を自動生成</p>
+        <button id="login-btn" class="btn btn-primary btn-large">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+            <path
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+            <path
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+            <path
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+          </svg>
+          Googleでログイン
+        </button>
+      </div>
+    </div>
+
+    <!-- メイン画面 -->
+    <div id="main-screen" class="screen hidden">
+      <!-- ヘッダー -->
+      <header class="header">
+        <div class="header-top">
+          <div class="user-info">
+            <img id="user-avatar" src="" alt="" class="avatar">
+            <span id="user-name" class="user-name"></span>
+          </div>
+          <div class="header-actions">
+            <button id="dashboard-btn" class="btn btn-icon" title="ダッシュボード">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="9" rx="1" />
+                <rect x="14" y="3" width="7" height="5" rx="1" />
+                <rect x="14" y="12" width="7" height="9" rx="1" />
+                <rect x="3" y="16" width="7" height="5" rx="1" />
+              </svg>
+            </button>
+            <button id="settings-btn" class="btn btn-icon" title="設定">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <button id="logout-btn" class="btn btn-ghost btn-small">ログアウト</button>
+          </div>
+
+          <div class="date-nav">
+            <button id="prev-day" class="btn btn-icon" aria-label="前日">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <div class="date-display">
+              <span id="current-date" class="current-date"></span>
+              <button id="today-btn" class="btn btn-ghost btn-small">今日</button>
+            </div>
+            <button id="next-day" class="btn btn-icon" aria-label="翌日">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="stats-bar">
+            <div class="stat">
+              <span class="stat-label">予定数</span>
+              <span id="event-count" class="stat-value">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">合計時間</span>
+              <span id="total-time" class="stat-value">0分</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">平均活用率</span>
+              <span id="avg-rate" class="stat-value">0%</span>
+            </div>
+          </div>
+      </header>
+
+      <!-- 予定リスト -->
+      <main class="main-content">
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div>
+          <p>予定を読み込み中...</p>
+        </div>
+
+        <div id="empty-state" class="empty-state hidden">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          <p>この日の予定はありません</p>
+        </div>
+
+        <div id="schedule-list" class="schedule-list"></div>
+      </main>
+
+      <!-- フッター -->
+      <footer class="footer">
+        <div class="footer-actions">
+          <button id="auto-estimate-btn" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+            自動推定
+          </button>
+          <button id="select-all-btn" class="btn btn-ghost">全選択</button>
+        </div>
+
+        <button id="preview-btn" class="btn btn-primary btn-large">
+          日報プレビュー
+        </button>
+      </footer>
+    </div>
+
+    <!-- プレビューモーダル -->
+    <div id="preview-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>日報プレビュー</h2>
+          <button id="close-modal" class="btn btn-icon" aria-label="閉じる">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="preview-content" class="preview-content"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-btn" class="btn btn-secondary">キャンセル</button>
+          <button id="submit-btn" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13" />
+              <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
+            送信
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定モーダル -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>設定</h2>
+          <button id="close-settings" class="btn btn-icon" aria-label="閉じる">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <!-- 保存先選択 -->
+          <!-- カレンダー選択 -->
+          <div class="form-group">
+            <label class="form-label">📅 表示するカレンダー</label>
+            <p class="form-hint">日報に含めるカレンダーを選択してください</p>
+            <div id="calendar-list" class="calendar-list">
+              <div class="loading-text">カレンダーを読み込み中...</div>
+            </div>
+            <button id="refresh-calendars-btn" class="btn btn-secondary btn-small" style="margin-top: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+              カレンダー更新
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">保存先</label>
+            <div class="toggle-group">
+              <button id="toggle-sheets" class="toggle-btn active" data-target="sheets">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z" />
+                  <path d="M7 12h2v5H7zm4-3h2v8h-2zm4-3h2v11h-2z" />
+                </svg>
+                Googleスプレッドシート
+              </button>
+              <button id="toggle-notion" class="toggle-btn" data-target="notion">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M4 4.5A2.5 2.5 0 0 1 6.5 2H18a2.5 2.5 0 0 1 2.5 2.5v15a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 19.5v-15zM6.5 4a.5.5 0 0 0-.5.5v15a.5.5 0 0 0 .5.5H18a.5.5 0 0 0 .5-.5v-15a.5.5 0 0 0-.5-.5H6.5z" />
+                  <path d="M8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z" />
+                </svg>
+                Notion
+              </button>
+            </div>
+          </div>
+
+          <!-- Googleスプレッドシート設定 -->
+          <div id="sheets-settings" class="settings-panel">
+            <div class="form-group">
+              <label for="spreadsheet-id">スプレッドシートID <span class="required">*</span></label>
+              <input type="text" id="spreadsheet-id" class="form-input"
+                placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">
+              <p class="form-hint">
+                URLの <code>/d/</code> と <code>/edit</code> の間の部分をコピーしてください<br>
+                例: https://docs.google.com/spreadsheets/d/<strong>ここがID</strong>/edit
+              </p>
+            </div>
+            <div class="form-group">
+              <label for="sheet-name">シート名</label>
+              <input type="text" id="sheet-name" class="form-input" value="Sheet1" placeholder="Sheet1">
+            </div>
+            <div class="connection-status" id="sheets-status">
+              <span class="status-icon">○</span>
+              <span class="status-text">未接続</span>
+            </div>
+            <button id="test-sheets-btn" class="btn btn-secondary btn-small">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              接続テスト
+            </button>
+          </div>
+
+          <!-- Notion設定 -->
+          <div id="notion-settings" class="settings-panel hidden">
+            <div class="form-group">
+              <label for="notion-token">Notion インテグレーショントークン <span class="required">*</span></label>
+              <input type="password" id="notion-token" class="form-input" placeholder="secret_xxxxxxxxxxxxxxxxxxxxxxxx">
+              <p class="form-hint">
+                <a href="https://www.notion.so/my-integrations" target="_blank">Notion Integrations</a> で作成したトークンを入力
+              </p>
+            </div>
+            <div class="form-group">
+              <label for="notion-database-id">データベースID <span class="required">*</span></label>
+              <input type="text" id="notion-database-id" class="form-input"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+              <p class="form-hint">
+                NotionデータベースのURLから取得<br>
+                例: https://notion.so/<strong>ここがID</strong>?v=...
+            </div>
+            <div class="connection-status" id="notion-status">
+              <span class="status-icon">○</span>
+              <span class="status-text">未接続</span>
+            </div>
+            <button id="test-notion-btn" class="btn btn-secondary btn-small">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              接続テスト
+            </button>
+          </div>
+
+          <!-- 送信先の有効/無効 -->
+          <div class="form-group">
+            <label class="form-label">送信先の有効化</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="enable-sheets" checked>
+                <span>Googleスプレッドシートに保存</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="enable-notion">
+                <span>Notionに保存</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- AI分析設定 -->
+          <div class="settings-section">
+            <h4 class="settings-section-title">🤖 AI分析設定（Gemini）</h4>
+            <div class="form-group">
+              <label for="gemini-api-key">Gemini API Key</label>
+              <input type="password" id="gemini-api-key" class="form-input" placeholder="AIza...">
+              <p class="form-hint">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> でAPI Keyを取得
+              </p>
+            </div>
+            <div class="connection-status" id="gemini-status">
+              <span class="status-icon">○</span>
+              <span class="status-text">未接続</span>
+            </div>
+            <button id="test-gemini-btn" class="btn btn-secondary btn-small">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              接続テスト
+            </button>
+            <label class="checkbox-label" style="margin-top: 12px;">
+              <input type="checkbox" id="enable-ai-analysis">
+              <span>送信時にAI分析を実行</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-settings-btn" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <polyline points="17 21 17 13 7 13 7 21" />
+              <polyline points="7 3 7 8 15 8" />
+            </svg>
+            設定を保存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI分析結果モーダル -->
+    <div id="ai-analysis-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>🤖 AI分析レポート</h2>
+          <button id="close-ai-analysis" class="btn btn-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body ai-analysis-content" id="ai-analysis-content">
+          <!-- AI分析結果がここに表示される -->
+        </div>
+        <div class="modal-footer">
+          <button id="close-ai-analysis-btn" class="btn btn-secondary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ダッシュボードモーダル -->
+    <div id="dashboard-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>📊 ダッシュボード</h2>
+          <button id="close-dashboard" class="btn btn-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <!-- サマリー -->
+          <div class="dashboard-section">
+            <h3>📅 サマリー</h3>
+            <div class="chart-period-tabs" id="summary-period-tabs">
+              <button class="chart-tab active" data-summary-period="daily">日別</button>
+              <button class="chart-tab" data-summary-period="weekly">週別</button>
+              <button class="chart-tab" data-summary-period="monthly">月別</button>
+            </div>
+            <div id="summary-period-label" class="form-hint" style="margin-bottom: 8px;">本日</div>
+            <div class="stats-grid" id="daily-stats">
+              <div class="stat-card">
+                <div class="stat-value" id="stat-events">-</div>
+                <div class="stat-label">予定数</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="stat-hours">-</div>
+                <div class="stat-label">稼働時間</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="stat-ai-using">-</div>
+                <div class="stat-label">AI活用中</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="stat-ai-rate">-</div>
+                <div class="stat-label">AI活用率</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI活用時間グラフ -->
+          <div class="dashboard-section">
+            <h3>📈 AI活用時間の推移</h3>
+            <div class="chart-period-tabs">
+              <button class="chart-tab active" data-period="daily">日別</button>
+              <button class="chart-tab" data-period="weekly">週別</button>
+              <button class="chart-tab" data-period="monthly">月別</button>
+            </div>
+            <div class="chart-container">
+              <canvas id="ai-time-chart"></canvas>
+              <div id="chart-no-data" class="chart-no-data hidden">データがありません</div>
+            </div>
+          </div>
+
+          <!-- カレンダー別ランキング -->
+          <div class="dashboard-section">
+            <h3>🏆 カレンダー別AI活用ランキング</h3>
+            <div id="calendar-ranking" class="calendar-ranking">
+              <div class="chart-no-data">データがありません</div>
+            </div>
+          </div>
+
+          <!-- AI分析レポート生成 -->
+          <div class="dashboard-section">
+            <h3>🤖 AI分析レポート生成</h3>
+            <p class="form-hint">任意のタイミングでAI分析レポートを生成できます</p>
+            <div class="report-buttons">
+              <button id="generate-weekly-report" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                週次レポート生成
+              </button>
+              <button id="generate-monthly-report" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                  <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+                </svg>
+                月次レポート生成
+              </button>
+            </div>
+          </div>
+
+          <!-- 分析結果表示エリア -->
+          <div class="dashboard-section" id="dashboard-report-section" style="display: none;">
+            <h3>📝 分析結果</h3>
+            <div class="ai-analysis-content" id="dashboard-report-content"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="close-dashboard-btn" class="btn btn-secondary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="toast hidden">
+      <span id="toast-message"></span>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+
+</html>

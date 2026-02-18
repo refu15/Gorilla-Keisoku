@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "AI活用度測定 - 日報作成アシスタント",
+  "version": "1.0.0",
+  "description": "Googleカレンダーから日報を自動生成し、各予定のAI活用度を記録します",
+  "permissions": [
+    "identity",
+    "storage",
+    "sidePanel",
+    "activeTab",
+    "alarms",
+    "notifications"
+  ],
+  "oauth2": {
+    "client_id": "833888816532-9sa6e0heqadbfs4hfhtl8671ph7fepif.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/spreadsheets"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    },
+    "default_title": "AI活用度測定"
+  },
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  },
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://api.notion.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ]
+}

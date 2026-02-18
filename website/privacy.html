@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プライバシーポリシー | Gorilla Keisoku</title>
+    <meta name="description" content="Gorilla Keisoku（AI活用度測定 - 日報作成アシスタント）のプライバシーポリシー">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%236366f1'/><path d='M20 32L28 40L44 24' stroke='white' stroke-width='4' fill='none'/></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+                    <circle cx="32" cy="32" r="30" fill="url(#g1)" />
+                    <path d="M20 32L28 40L44 24" stroke="white" stroke-width="4" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <defs>
+                        <linearGradient id="g1" x1="0" y1="0" x2="64" y2="64">
+                            <stop offset="0%" stop-color="#6366f1" />
+                            <stop offset="100%" stop-color="#8b5cf6" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                Gorilla Keisoku
+            </a>
+            <ul class="nav-links">
+                <li><a href="/">ホーム</a></li>
+                <li><a href="privacy.html">プライバシー</a></li>
+                <li><a href="terms.html">利用規約</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Privacy Policy -->
+    <main class="legal-page">
+        <h1>プライバシーポリシー</h1>
+        <p class="last-updated">最終更新日: 2026年2月18日</p>
+
+        <p>Gorilla Keisoku（以下「本拡張機能」）は、ユーザーのプライバシーを重視しています。本プライバシーポリシーでは、本拡張機能が収集、使用、保護する情報について説明します。</p>
+
+        <h2>1. 収集する情報</h2>
+
+        <h3>1.1 Google アカウント情報</h3>
+        <p>本拡張機能は、OAuth 2.0認証を通じて以下の情報にアクセスします：</p>
+        <ul>
+            <li>メールアドレス（ユーザー識別に使用）</li>
+            <li>ユーザープロフィール情報（表示名・アイコン）</li>
+        </ul>
+
+        <h3>1.2 Googleカレンダーデータ</h3>
+        <p>ユーザーの許可のもと、当日のカレンダー予定を<strong>読み取り専用</strong>でアクセスします。取得するデータ：</p>
+        <ul>
+            <li>予定のタイトル</li>
+            <li>開始・終了時刻</li>
+            <li>カレンダー名</li>
+        </ul>
+
+        <h3>1.3 スプレッドシートデータ</h3>
+        <p>ユーザーが指定したGoogleスプレッドシートに対して読み書きを行います。保存されるデータ：</p>
+        <ul>
+            <li>日報データ（予定タイトル、AI活用度、メモ）</li>
+            <li>日次サマリー（DailySummary）</li>
+            <li>カレンダー別サマリー（CalendarSummary）</li>
+            <li>週次・月次レポート（WeeklyReport、MonthlyReport）</li>
+        </ul>
+
+        <h3>1.4 ユーザーが入力するデータ</h3>
+        <ul>
+            <li>各予定のAI活用フラグ（使用中 / 余地あり / なし）</li>
+            <li>AI活用率（0〜100%）</li>
+            <li>メモ（任意入力）</li>
+        </ul>
+
+        <h2>2. 情報の使用目的</h2>
+        <p>収集した情報は以下の目的にのみ使用します：</p>
+        <ul>
+            <li>日報の自動生成および保存</li>
+            <li>AI活用度の集計・分析</li>
+            <li>ダッシュボードでのデータ可視化</li>
+            <li>Gemini APIを用いたレポート生成（ユーザーが設定した場合のみ）</li>
+            <li>定期レポートの自動生成と通知</li>
+        </ul>
+
+        <h2>3. データの保存先</h2>
+
+        <div class="info-box">
+            <p><strong>本拡張機能は独自のサーバーを持ちません。</strong></p>
+            <p>すべてのデータは、ユーザーのGoogleアカウントに紐づくGoogleスプレッドシートに保存されます。</p>
+        </div>
+
+        <ul>
+            <li><strong>スプレッドシート</strong>: ユーザーが指定したGoogleスプレッドシートに保存</li>
+            <li><strong>ブラウザローカル</strong>: 設定情報（APIキー、スプレッドシートID）は <code>chrome.storage.sync</code> に暗号化して保存</li>
+            <li><strong>下書きデータ</strong>: 未送信の日報データは <code>chrome.storage.local</code> に一時保存</li>
+        </ul>
+
+        <h2>4. 第三者への情報提供</h2>
+        <p>本拡張機能は、ユーザーの情報を第三者に販売、貸与、または共有することはありません。ただし、以下のサービスに対してデータが送信される場合があります：</p>
+        <ul>
+            <li><strong>Google APIs</strong>: カレンダーデータの取得、スプレッドシートへの保存</li>
+            <li><strong>Gemini API</strong>: レポート生成のためにデータの要約がGoogle Gemini APIに送信されます（ユーザーがAPIキーを設定した場合のみ）</li>
+            <li><strong>Notion API</strong>: Notion連携を設定した場合のみ、日報データがNotionに送信されます</li>
+        </ul>
+
+        <h2>5. データのセキュリティ</h2>
+        <ul>
+            <li>OAuth 2.0による安全な認証フロー</li>
+            <li>すべてのAPI通信はHTTPS経由で暗号化</li>
+            <li>認証トークンはChromeの安全なストレージに管理</li>
+            <li>APIキーはユーザーのブラウザ内にのみ保存（外部送信なし）</li>
+        </ul>
+
+        <h2>6. ユーザーの権利</h2>
+        <p>ユーザーは以下の権利を有します：</p>
+        <ul>
+            <li><strong>アクセス取り消し</strong>: Googleアカウントの設定からいつでもアクセス権限を取り消せます</li>
+            <li><strong>データ削除</strong>: スプレッドシートのデータはユーザー自身で直接削除できます</li>
+            <li><strong>拡張機能の削除</strong>: Chromeの拡張機能管理からいつでもアンインストール可能です</li>
+            <li><strong>設定の初期化</strong>: 拡張機能の設定画面からすべてのローカルデータを削除できます</li>
+        </ul>
+
+        <h2>7. Cookieの使用</h2>
+        <p>本拡張機能はCookieを使用しません。認証情報はChromeの <code>chrome.identity</code> APIを通じて管理されます。</p>
+
+        <h2>8. 子どものプライバシー</h2>
+        <p>本拡張機能は13歳未満の児童を対象としていません。13歳未満のユーザーからの情報を意図的に収集することはありません。</p>
+
+        <h2>9. ポリシーの変更</h2>
+        <p>本プライバシーポリシーは、必要に応じて更新される場合があります。重要な変更がある場合は、本ページにて通知します。</p>
+
+        <h2>10. お問い合わせ</h2>
+        <p>本プライバシーポリシーに関するご質問がある場合は、<a href="https://github.com/refu15/Gorilla-Keisoku/issues" target="_blank">GitHub
+                Issues</a>よりお問い合わせください。</p>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-links">
+                <a href="/">ホーム</a>
+                <a href="privacy.html">プライバシーポリシー</a>
+                <a href="terms.html">利用規約</a>
+                <a href="https://github.com/refu15/Gorilla-Keisoku" target="_blank">GitHub</a>
+            </div>
+            <p class="footer-copy">&copy; 2026 Gorilla Keisoku. All rights reserved.</p>
+        </div>
+    </footer>
+
+</body>
+
+</html>
