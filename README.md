@@ -106,7 +106,8 @@ keisokuGoogle/
 - `identity`: OAuth認証
 - `storage`: データ保存
 - `sidePanel`: サイドパネル表示
-- `activeTab`: 現在のタブへのアクセス
+- `alarms`: 定期処理・リマインダー
+- `notifications`: 通知表示
 
 ### OAuthスコープ
 

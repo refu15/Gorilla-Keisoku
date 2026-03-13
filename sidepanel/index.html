@@ -52,14 +52,15 @@
     <div id="main-screen" class="screen hidden">
       <!-- ヘッダー -->
       <header class="header">
-        <div class="header-top">
+        <!-- Row 1: user + actions -->
+        <div class="header-row-1">
           <div class="user-info">
             <img id="user-avatar" src="" alt="" class="avatar">
             <span id="user-name" class="user-name"></span>
           </div>
           <div class="header-actions">
             <button id="dashboard-btn" class="btn btn-icon" title="ダッシュボード">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="9" rx="1" />
                 <rect x="14" y="3" width="7" height="5" rx="1" />
                 <rect x="14" y="12" width="7" height="9" rx="1" />
@@ -67,7 +68,7 @@
               </svg>
             </button>
             <button id="settings-btn" class="btn btn-icon" title="設定">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3" />
                 <path
                   d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -75,39 +76,53 @@
             </button>
             <button id="logout-btn" class="btn btn-ghost btn-small">ログアウト</button>
           </div>
+        </div>
 
-          <div class="date-nav">
-            <button id="prev-day" class="btn btn-icon" aria-label="前日">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-            <div class="date-display">
-              <span id="current-date" class="current-date"></span>
-              <button id="today-btn" class="btn btn-ghost btn-small">今日</button>
-            </div>
-            <button id="next-day" class="btn btn-icon" aria-label="翌日">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
+        <!-- Row 2: date nav -->
+        <div class="header-row-2">
+          <button id="prev-day" class="btn btn-icon btn-nav" aria-label="前日">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <div class="date-display">
+            <span id="current-date" class="current-date"></span>
+            <button id="today-btn" class="btn-today">今日</button>
           </div>
-
-          <div class="stats-bar">
-            <div class="stat">
-              <span class="stat-label">予定数</span>
-              <span id="event-count" class="stat-value">0</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">合計時間</span>
-              <span id="total-time" class="stat-value">0分</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">平均活用率</span>
-              <span id="avg-rate" class="stat-value">0%</span>
-            </div>
-          </div>
+          <button id="next-day" class="btn btn-icon btn-nav" aria-label="翌日">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        </div>
       </header>
+
+      <!-- 統計バー（ヘッダー外） -->
+      <div class="stats-strip">
+        <div class="stat-card">
+          <span class="stat-card-label">予定数</span>
+          <span id="event-count" class="stat-card-value">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card-label">稼働時間</span>
+          <span id="total-time" class="stat-card-value">0分</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card-label">AI活用率</span>
+          <span id="avg-rate" class="stat-card-value">0%</span>
+        </div>
+      </div>
+
+      <div class="stats-strip hidden" id="impact-stats-bar" style="margin-top: -4px;">
+        <div class="stat-card stat-card--accent">
+          <span class="stat-card-label">AI削減時間(月)</span>
+          <span id="impact-time-saved" class="stat-card-value">0時間</span>
+        </div>
+        <div class="stat-card stat-card--accent">
+          <span class="stat-card-label">MVPアクション</span>
+          <span id="impact-high-score" class="stat-card-value">0件</span>
+        </div>
+      </div>
 
       <!-- 予定リスト -->
       <main class="main-content">
@@ -127,6 +142,38 @@
         </div>
 
         <div id="schedule-list" class="schedule-list"></div>
+
+        <!-- AI分析レポートセクション -->
+        <div id="quick-report-section" class="quick-report-section panel mt-md">
+          <div class="panel-header" id="quick-report-header">
+            <h3>🤖 AI分析レポート</h3>
+            <button class="btn btn-icon btn-small">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+          <div class="panel-body hidden" id="quick-report-body">
+            <div class="report-actions">
+              <button id="quick-report-daily" class="btn btn-secondary btn-small">日次</button>
+              <button id="quick-report-weekly" class="btn btn-secondary btn-small">週次</button>
+              <button id="quick-report-monthly" class="btn btn-secondary btn-small">月次</button>
+            </div>
+            <div id="quick-report-result" class="report-result hidden">
+              <div class="report-loading hidden">
+                <div class="spinner-small"></div> 分析中...
+              </div>
+              <div class="report-text markdown-body" id="quick-report-text"></div>
+              <button id="copy-report-btn" class="btn btn-ghost btn-small mt-sm hidden">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                コピー
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
 
       <!-- フッター -->
@@ -144,16 +191,65 @@
         </div>
 
         <button id="preview-btn" class="btn btn-primary btn-large">
-          日報プレビュー
+          AI時間計測
+        </button>
+        <button id="wizard-btn" class="btn btn-wizard btn-large">
+          📋 日報作成
         </button>
       </footer>
+    </div>
+
+    <!-- 日報ウィザードモーダル -->
+    <div id="wizard-modal" class="modal hidden">
+      <div class="modal-content modal-wizard">
+        <div class="modal-header wizard-header">
+          <div class="wizard-title-area">
+            <h2 id="wizard-title">📋 日報作成ウィザード</h2>
+            <span id="wizard-step-label" class="wizard-step-label">STEP 1/5</span>
+          </div>
+          <button id="wizard-close-btn" class="btn btn-icon" aria-label="閉じる">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- ステップインジケーター -->
+        <div class="wizard-step-indicator">
+          <span class="wizard-dot active" data-step="1"></span>
+          <span class="wizard-dot" data-step="2"></span>
+          <span class="wizard-dot" data-step="3"></span>
+          <span class="wizard-dot" data-step="4"></span>
+          <span class="wizard-dot" data-step="5"></span>
+          <span class="wizard-dot" data-step="6"></span>
+        </div>
+
+        <!-- コンテンツエリア -->
+        <div class="modal-body wizard-body">
+          <div id="wizard-step-content" class="wizard-step-content">
+            <!-- 取得中スピナー -->
+            <div id="wizard-loading" class="wizard-loading hidden">
+              <div class="spinner"></div>
+              <p id="wizard-loading-msg">カレンダーを取得中...</p>
+            </div>
+            <!-- 内容エリア（JSで動的に生成） -->
+          </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="modal-footer wizard-footer">
+          <button id="wizard-back-btn" class="btn btn-secondary" disabled>← 戻る</button>
+          <button id="wizard-ok-btn" class="btn btn-primary">OK → 次へ</button>
+        </div>
+      </div>
     </div>
 
     <!-- プレビューモーダル -->
     <div id="preview-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>日報プレビュー</h2>
+          <h2>AI時間計測</h2>
           <button id="close-modal" class="btn btn-icon" aria-label="閉じる">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -198,7 +294,7 @@
             <div id="calendar-list" class="calendar-list">
               <div class="loading-text">カレンダーを読み込み中...</div>
             </div>
-            <button id="refresh-calendars-btn" class="btn btn-secondary btn-small" style="margin-top: 8px;">
+            <button id="refresh-calendars-btn" class="btn btn-secondary btn-small mt-sm">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 4v6h-6M1 20v-6h6" />
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
@@ -244,6 +340,10 @@
               <label for="sheet-name">シート名</label>
               <input type="text" id="sheet-name" class="form-input" value="Sheet1" placeholder="Sheet1">
             </div>
+            <div class="form-group">
+              <label for="directory-spreadsheet-id">名簿スプレッドシートID (任意)</label>
+              <input type="text" id="directory-spreadsheet-id" class="form-input" placeholder="1BxiMVs0XRA5nFMdNs...">
+            </div>
             <div class="connection-status" id="sheets-status">
               <span class="status-icon">○</span>
               <span class="status-text">未接続</span>
@@ -263,7 +363,8 @@
               <label for="notion-token">Notion インテグレーショントークン <span class="required">*</span></label>
               <input type="password" id="notion-token" class="form-input" placeholder="secret_xxxxxxxxxxxxxxxxxxxxxxxx">
               <p class="form-hint">
-                <a href="https://www.notion.so/my-integrations" target="_blank">Notion Integrations</a> で作成したトークンを入力
+                <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer">Notion
+                  Integrations</a> で作成したトークンを入力
               </p>
             </div>
             <div class="form-group">
@@ -273,6 +374,7 @@
               <p class="form-hint">
                 NotionデータベースのURLから取得<br>
                 例: https://notion.so/<strong>ここがID</strong>?v=...
+              </p>
             </div>
             <div class="connection-status" id="notion-status">
               <span class="status-icon">○</span>
@@ -309,7 +411,8 @@
               <label for="gemini-api-key">Gemini API Key</label>
               <input type="password" id="gemini-api-key" class="form-input" placeholder="AIza...">
               <p class="form-hint">
-                <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> でAPI Keyを取得
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI
+                  Studio</a> でAPI Keyを取得
               </p>
             </div>
             <div class="connection-status" id="gemini-status">
@@ -323,10 +426,136 @@
               </svg>
               接続テスト
             </button>
-            <label class="checkbox-label" style="margin-top: 12px;">
-              <input type="checkbox" id="enable-ai-analysis">
-              <span>送信時にAI分析を実行</span>
             </label>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="enable-ai-analysis" checked>
+                <span>日報送信後に自動でAI分析を行う</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 自動日報作成設定 -->
+          <div class="settings-section">
+            <h4 class="settings-section-title">⏰ 自動日報作成設定</h4>
+            <p class="form-hint">
+              ※ブラウザを開いている時間帯のみ動作します。<br>
+              指定した時間に「DailySummary」に本日の記録がなければ、自動で日報を生成・保存します。
+            </p>
+            <div class="form-group mt-sm">
+              <label class="checkbox-label">
+                <input type="checkbox" id="enable-daily-alarm">
+                <span>指定した時刻に自動で日報を作成する</span>
+              </label>
+            </div>
+            <div class="form-group mt-sm">
+              <label for="alarm-time">日報の自動作成・チェック実行時間</label>
+              <input type="time" id="alarm-time" class="form-input" value="18:00">
+            </div>
+          </div>
+
+          <!-- Slack通知設定 -->
+          <div class="settings-section">
+            <h4 class="settings-section-title">💬 Slack通知設定</h4>
+            <p class="form-hint">日報の送信先としてSlackへ通知を行う設定です。</p>
+            <div class="form-group mt-sm">
+              <label class="checkbox-label">
+                <input type="checkbox" id="enable-slack-notification">
+                <span>Slackへの日報通知・アラートを有効にする</span>
+              </label>
+            </div>
+            <div class="form-group mt-sm">
+              <label for="slack-webhook-url">Slack Webhook URL</label>
+              <input type="password" id="slack-webhook-url" class="form-input"
+                placeholder="https://hooks.slack.com/services/...">
+              <p class="form-hint">
+                <a href="https://slack.com/intl/ja-jp/help/articles/115005265063" target="_blank"
+                  rel="noopener noreferrer">SlackでのIncoming Webhook設定方法についてはこちら</a><br>
+                ※チャンネルにWebhookアプリを追加し、発行されたURLを貼り付けてください。
+              </p>
+              <div class="connection-status" id="slack-status">
+                <span class="status-icon">○</span>
+                <span class="status-text">未接続</span>
+              </div>
+              <button id="test-slack-btn" class="btn btn-secondary btn-small">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                通知テスト
+              </button>
+            </div>
+          </div>
+
+          <!-- 日報ウィザード設定 -->
+          <div class="settings-section">
+            <h4 class="settings-section-title">📋 日報作成設定</h4>
+            <div class="form-group">
+              <label for="wizard-work-profile">業務体系と定型文（一言）</label>
+              <p class="form-hint">
+                ウィザードで業務名が一致した際、設定した一言が優先して表示されます。<br>
+                リストから不要な一言を削除したり、新しく追加することができます。
+              </p>
+
+              <div id="wizard-profile-list" class="group-list mt-sm">
+                <!-- プロファイルリストが動的に生成される -->
+                <div class="empty-state-small">設定はありません</div>
+              </div>
+
+              <div class="form-group mt-md"
+                style="padding: 12px; background: var(--bg-tertiary); border-radius: var(--border-radius);">
+                <label>新規追加</label>
+                <input type="text" id="wizard-profile-category-input" class="form-input mb-sm"
+                  placeholder="業務名（例: 営業資料作成）">
+                <input type="text" id="wizard-profile-oneliners-input" class="form-input mb-sm"
+                  placeholder="一言（カンマ区切り。例: リサーチ構成作成, スライドデザイン）">
+                <button id="add-wizard-profile-btn" class="btn btn-secondary btn-small w-full">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  追加
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- グループ設定 -->
+          <div class="settings-section">
+            <h4 class="settings-section-title">👥 グループ設定</h4>
+            <p class="form-hint">ダッシュボードで集計するグループを定義します</p>
+
+            <div id="group-list" class="group-list">
+              <!-- グループリストが動的に生成される -->
+              <div class="empty-state-small">グループはありません</div>
+            </div>
+
+            <button id="add-group-btn" class="btn btn-secondary btn-small mt-sm w-full">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              グループを追加
+            </button>
+          </div>
+
+          <!-- グループ編集用サブモーダル（設定モーダル内に表示するか、DOM操作で切り替える） -->
+          <div id="group-edit-panel" class="settings-panel hidden mt-md">
+            <h5 class="sub-title">グループ編集</h5>
+            <div class="form-group">
+              <label for="group-name">グループ名</label>
+              <input type="text" id="group-name" class="form-input" placeholder="エンジニアチーム">
+            </div>
+            <div class="form-group">
+              <label for="group-members">メンバー (Email)</label>
+              <p class="form-hint">カンマ区切りで入力してください</p>
+              <textarea id="group-members" class="form-input" rows="3"
+                placeholder="user1@example.com, user2@example.com"></textarea>
+            </div>
+            <div class="button-group">
+              <button id="cancel-group-edit" class="btn btn-ghost btn-small">キャンセル</button>
+              <button id="save-group-edit" class="btn btn-primary btn-small">保存</button>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -368,6 +597,12 @@
       <div class="modal-content modal-large">
         <div class="modal-header">
           <h2>📊 ダッシュボード</h2>
+          <div class="dashboard-controls">
+            <select id="dashboard-scope" class="form-input dashboard-scope-select">
+              <option value="personal">個人</option>
+              <!-- グループが動的に追加される -->
+            </select>
+          </div>
           <button id="close-dashboard" class="btn btn-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -384,7 +619,7 @@
               <button class="chart-tab" data-summary-period="weekly">週別</button>
               <button class="chart-tab" data-summary-period="monthly">月別</button>
             </div>
-            <div id="summary-period-label" class="form-hint" style="margin-bottom: 8px;">本日</div>
+            <div id="summary-period-label" class="form-hint mb-sm">本日</div>
             <div class="stats-grid" id="daily-stats">
               <div class="stat-card">
                 <div class="stat-value" id="stat-events">-</div>
@@ -452,12 +687,33 @@
                 月次レポート生成
               </button>
             </div>
+            <div class="report-buttons mt-sm">
+              <button id="generate-daily-slack-btn" class="btn btn-primary" style="width: 100%;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 2L11 13" />
+                  <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
+                本日の日報をSlackへ手動送信
+              </button>
+            </div>
           </div>
 
-          <!-- 分析結果表示エリア -->
-          <div class="dashboard-section" id="dashboard-report-section" style="display: none;">
-            <h3>📝 分析結果</h3>
-            <div class="ai-analysis-content" id="dashboard-report-content"></div>
+          <!-- 週次レポート表示エリア -->
+          <div class="dashboard-section hidden" id="dashboard-report-section-weekly">
+            <div class="report-section-header">
+              <h3 id="report-heading-weekly">📝 週次レポート</h3>
+              <button class="report-delete-btn" data-type="weekly" title="レポートを削除">✕</button>
+            </div>
+            <div class="ai-analysis-content" id="dashboard-report-content-weekly"></div>
+          </div>
+
+          <!-- 月次レポート表示エリア -->
+          <div class="dashboard-section hidden" id="dashboard-report-section-monthly">
+            <div class="report-section-header">
+              <h3 id="report-heading-monthly">📝 月次レポート</h3>
+              <button class="report-delete-btn" data-type="monthly" title="レポートを削除">✕</button>
+            </div>
+            <div class="ai-analysis-content" id="dashboard-report-content-monthly"></div>
           </div>
         </div>
         <div class="modal-footer">

@@ -116,7 +116,8 @@ export function estimateAllEvents(events) {
 export const AI_FLAG_OPTIONS = [
     { value: 'no', label: 'No - 活用なし' },
     { value: 'yes-using', label: 'Yes - 既に使用中' },
-    { value: 'yes-potential', label: 'Yes - 活用余地あり' }
+    { value: 'yes-potential', label: 'Yes - 活用余地あり' },
+    { value: 'yes-failed', label: 'Yes - 失敗・課題あり' }
 ];
 
 /**

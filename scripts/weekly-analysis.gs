@@ -13,16 +13,16 @@
 // 設定
 // ========================================
 const CONFIG = {
-  // Gemini API Key（Google AI Studioで取得）
-  GEMINI_API_KEY: 'YOUR_GEMINI_API_KEY_HERE',
+  // Gemini API Key（スクリプトプロパティから取得）
+  get GEMINI_API_KEY() { return PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || ''; },
   
   // シート名
   DAILY_SUMMARY_SHEET: 'DailySummary',
   WEEKLY_REPORT_SHEET: 'WeeklyReport',
   MONTHLY_REPORT_SHEET: 'MonthlyReport',
   
-  // メール送信先（空欄の場合は送信しない）
-  REPORT_EMAIL: '',
+  // メール送信先（スクリプトプロパティから取得）
+  get REPORT_EMAIL() { return PropertiesService.getScriptProperties().getProperty('REPORT_EMAIL') || ''; },
 };
 
 // ========================================
@@ -240,8 +240,8 @@ function aggregateWeeklyData(data) {
  * Gemini APIで分析
  */
 function analyzeWithGemini(summary) {
-  if (CONFIG.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-    return '（Gemini API Keyが設定されていません。CONFIG.GEMINI_API_KEYを設定してください。）';
+  if (!CONFIG.GEMINI_API_KEY) {
+    return '（Gemini API Keyが設定されていません。スクリプトプロパティに GEMINI_API_KEY を設定してください。）';
   }
   
   // カレンダー別ランキングテキスト生成
@@ -288,12 +288,13 @@ ${calendarText}
 - ツール名は具体的に書け（例: ChatGPT、GitHub Copilot、Gemini、NotebookLM）
 - 数値は元データから引用し、根拠のない数値を出すな`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
   
   try {
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
       contentType: 'application/json',
+      headers: { 'x-goog-api-key': CONFIG.GEMINI_API_KEY },
       payload: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
@@ -487,8 +488,8 @@ function getLastMonthData(sheet) {
  * 月次分析用のGemini API呼び出し
  */
 function analyzeMonthlyWithGemini(summary) {
-  if (CONFIG.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-    return '（Gemini API Keyが設定されていません。CONFIG.GEMINI_API_KEYを設定してください。）';
+  if (!CONFIG.GEMINI_API_KEY) {
+    return '（Gemini API Keyが設定されていません。スクリプトプロパティに GEMINI_API_KEY を設定してください。）';
   }
   
   // ユーザー別サマリーを整形
@@ -551,12 +552,13 @@ ${userSummaryText}
 - ツール名は具体的に書け（例: ChatGPT、GitHub Copilot、Gemini、NotebookLM）
 - 数値は元データから引用し、根拠のない数値を出すな`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
   
   try {
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
       contentType: 'application/json',
+      headers: { 'x-goog-api-key': CONFIG.GEMINI_API_KEY },
       payload: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }

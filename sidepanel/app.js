@@ -8,6 +8,8 @@ import { analyzeWithGemini, saveGeminiConfig, getGeminiConfig, testGeminiConnect
 import { estimateAIUsage, AI_FLAG_OPTIONS } from '../src/utils/ai-estimator.js';
 import { addToQueue, getQueue, retryQueue, isOffline, watchOnlineStatus } from '../src/utils/offline-queue.js';
 import { saveDraft, getDraft, deleteDraft, saveUserInfo, formatDate, formatDateJapanese } from '../src/utils/storage.js';
+import { markdownToSafeHtml, sanitizeForPrompt, escapeHtml } from '../src/utils/sanitize.js';
+import { initWizard, startWizard, updateWizardToken } from './wizard.js';
 
 // グローバル状態
 let currentDate = new Date();
@@ -47,6 +49,7 @@ const elements = {
     autoEstimateBtn: document.getElementById('auto-estimate-btn'),
     selectAllBtn: document.getElementById('select-all-btn'),
     previewBtn: document.getElementById('preview-btn'),
+    wizardBtn: document.getElementById('wizard-btn'),
 
     // プレビューモーダル
     previewModal: document.getElementById('preview-modal'),
@@ -80,6 +83,18 @@ const elements = {
     aiAnalysisContent: document.getElementById('ai-analysis-content'),
     closeAiAnalysis: document.getElementById('close-ai-analysis'),
     closeAiAnalysisBtn: document.getElementById('close-ai-analysis-btn'),
+    // 自動日報・Slack通知設定
+    enableDailyAlarm: document.getElementById('enable-daily-alarm'),
+    alarmTime: document.getElementById('alarm-time'),
+    enableSlackNotification: document.getElementById('enable-slack-notification'),
+    slackWebhookUrl: document.getElementById('slack-webhook-url'),
+    slackStatus: document.getElementById('slack-status'),
+    testSlackBtn: document.getElementById('test-slack-btn'),
+    //
+    wizardProfileList: document.getElementById('wizard-profile-list'),
+    wizardProfileCategoryInput: document.getElementById('wizard-profile-category-input'),
+    wizardProfileOnelinersInput: document.getElementById('wizard-profile-oneliners-input'),
+    addWizardProfileBtn: document.getElementById('add-wizard-profile-btn'),
     calendarList: document.getElementById('calendar-list'),
     refreshCalendarsBtn: document.getElementById('refresh-calendars-btn'),
     saveSettingsBtn: document.getElementById('save-settings-btn'),
@@ -95,8 +110,21 @@ const elements = {
     statAiRate: document.getElementById('stat-ai-rate'),
     generateWeeklyReport: document.getElementById('generate-weekly-report'),
     generateMonthlyReport: document.getElementById('generate-monthly-report'),
-    dashboardReportSection: document.getElementById('dashboard-report-section'),
-    dashboardReportContent: document.getElementById('dashboard-report-content'),
+    generateDailySlackBtn: document.getElementById('generate-daily-slack-btn'),
+    dashboardReportSectionWeekly: document.getElementById('dashboard-report-section-weekly'),
+    dashboardReportContentWeekly: document.getElementById('dashboard-report-content-weekly'),
+    dashboardReportSectionMonthly: document.getElementById('dashboard-report-section-monthly'),
+    dashboardReportContentMonthly: document.getElementById('dashboard-report-content-monthly'),
+
+    // AI分析レポート（メインページ）
+    quickReportHeader: document.getElementById('quick-report-header'),
+    quickReportBody: document.getElementById('quick-report-body'),
+    quickReportDaily: document.getElementById('quick-report-daily'),
+    quickReportWeekly: document.getElementById('quick-report-weekly'),
+    quickReportMonthly: document.getElementById('quick-report-monthly'),
+    quickReportResult: document.getElementById('quick-report-result'),
+    quickReportText: document.getElementById('quick-report-text'),
+    copyReportBtn: document.getElementById('copy-report-btn'),
 
     // トースト
     toast: document.getElementById('toast'),
@@ -128,6 +156,12 @@ function setupEventListeners() {
     elements.autoEstimateBtn.addEventListener('click', handleAutoEstimate);
     elements.selectAllBtn.addEventListener('click', handleSelectAll);
     elements.previewBtn.addEventListener('click', showPreview);
+    elements.wizardBtn.addEventListener('click', () => {
+        startWizard(currentEvents, scheduleData);
+    });
+
+    // ウィザード設定
+    elements.addWizardProfileBtn.addEventListener('click', handleAddWizardProfile);
 
     // プレビューモーダル
     elements.closeModal.addEventListener('click', hidePreview);
@@ -148,12 +182,37 @@ function setupEventListeners() {
     elements.closeAiAnalysis.addEventListener('click', hideAiAnalysis);
     elements.closeAiAnalysisBtn.addEventListener('click', hideAiAnalysis);
 
+    // AI分析レポート（メインページ）
+    elements.quickReportHeader.addEventListener('click', () => {
+        elements.quickReportBody.classList.toggle('hidden');
+        // 矢印アイコンの回転
+        const arrow = elements.quickReportHeader.querySelector('svg');
+        if (arrow) arrow.style.transform = elements.quickReportBody.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    });
+    elements.quickReportDaily.addEventListener('click', () => generateQuickReport('daily'));
+    elements.quickReportWeekly.addEventListener('click', () => generateQuickReport('weekly'));
+    elements.quickReportMonthly.addEventListener('click', () => generateQuickReport('monthly'));
+    elements.copyReportBtn.addEventListener('click', () => {
+        const text = elements.quickReportText.innerText;
+        navigator.clipboard.writeText(text).then(() => showToast('コピーしました', 'success'));
+    });
+
     // ダッシュボード
     elements.dashboardBtn.addEventListener('click', showDashboard);
     elements.closeDashboard.addEventListener('click', hideDashboard);
     elements.closeDashboardBtn.addEventListener('click', hideDashboard);
-    elements.generateWeeklyReport.addEventListener('click', () => generateReport('weekly'));
-    elements.generateMonthlyReport.addEventListener('click', () => generateReport('monthly'));
+    elements.generateWeeklyReport.addEventListener('click', () => handleGenerateReport('weekly'));
+    elements.generateMonthlyReport.addEventListener('click', () => handleGenerateReport('monthly'));
+    elements.generateDailySlackBtn.addEventListener('click', handleGenerateDailySlack);
+    elements.dashboardModal.querySelectorAll('.report-delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (e.currentTarget.dataset.type === 'weekly') {
+                elements.dashboardReportSectionWeekly.style.display = 'none';
+            } else {
+                elements.dashboardReportSectionMonthly.style.display = 'none';
+            }
+        });
+    });
 
     // チャート期間切替タブ
     document.querySelectorAll('.chart-tab').forEach(tab => {
@@ -171,6 +230,7 @@ async function checkAuth() {
         authToken = await getAuthToken();
         currentUser = await getUserInfo(authToken);
         await saveUserInfo(currentUser);
+        initWizard(authToken);
         showMainScreen();
         await loadEvents();
     } catch (error) {
@@ -188,6 +248,7 @@ async function handleLogin() {
         authToken = await getAuthToken();
         currentUser = await getUserInfo(authToken);
         await saveUserInfo(currentUser);
+        initWizard(authToken);
 
         showMainScreen();
         await loadEvents();
@@ -275,7 +336,14 @@ async function loadEvents() {
         updateStats();
     } catch (error) {
         console.error('イベント取得エラー:', error);
-        showToast('予定の取得に失敗しました', 'error');
+        if (error.message && (error.message.includes('authentication credentials') || error.message.includes('OAuth 2'))) {
+            showToast('認証の有効期限が切れました。再度ログインが必要です。', 'error');
+            setTimeout(() => {
+                handleLogout();
+            }, 1000);
+        } else {
+            showToast('予定の取得に失敗しました', 'error');
+        }
     } finally {
         elements.loading.classList.add('hidden');
     }
@@ -314,17 +382,17 @@ function createScheduleItem(event, eventId, data) {
 
     div.innerHTML = `
     <div class="schedule-item-header">
-      <div class="schedule-color" style="background-color: ${calendarColor}"></div>
+      <div class="schedule-color" data-color="${calendarColor}"></div>
       <div class="schedule-info">
-        <div class="schedule-title">${event.summary || '（タイトルなし）'}</div>
+        <div class="schedule-title">${escapeHtml(event.summary || '（タイトルなし）')}</div>
         <div class="schedule-time">
           ${startTime} - ${endTime}
           <span class="schedule-duration">(${formatDuration(duration)})</span>
         </div>
-        ${event.calendarName ? `<div class="schedule-calendar">${event.calendarName}</div>` : ''}
+        ${event.calendarName ? `<div class="schedule-calendar">${escapeHtml(event.calendarName)}</div>` : ''}
         ${estimate.matchedKeyword ? `
           <span class="ai-estimate-badge ${estimate.confidence}">
-            自動推定: ${estimate.matchedKeyword}
+            自動推定: ${escapeHtml(estimate.matchedKeyword)}
           </span>
         ` : ''}
       </div>
@@ -375,6 +443,11 @@ function createScheduleItem(event, eventId, data) {
 
 // アイテムのイベントリスナー設定
 function setupItemEventListeners(item, eventId) {
+    const colorEl = item.querySelector('.schedule-color');
+    if (colorEl && colorEl.dataset.color) {
+        colorEl.style.backgroundColor = colorEl.dataset.color;
+    }
+
     const checkbox = item.querySelector('[data-field="included"]');
     checkbox.addEventListener('change', (e) => {
         updateScheduleData(eventId, 'included', e.target.checked);
@@ -572,12 +645,12 @@ function generatePreviewHTML(data) {
     <div class="preview-entries">
       ${data.entries.map(entry => `
         <div class="preview-entry">
-          <div class="preview-entry-title">${entry.title}</div>
+          <div class="preview-entry-title">${escapeHtml(entry.title)}</div>
           <div class="preview-entry-details">
             ${entry.start} - ${entry.end} | 
             ${AI_FLAG_OPTIONS.find(o => o.value === entry.aiFlag)?.label || 'No'} | 
             活用率: ${entry.aiRate}%
-            ${entry.note ? `<br>メモ: ${entry.note}` : ''}
+            ${entry.note ? `<br>メモ: ${escapeHtml(entry.note)}` : ''}
           </div>
         </div>
       `).join('')}
@@ -644,7 +717,7 @@ async function handleSubmit() {
                 await deleteDraft(previewData.dateFormatted);
 
                 // AI分析を実行
-                const { enableAiAnalysis } = await chrome.storage.sync.get(['enableAiAnalysis']);
+                const { enableAiAnalysis } = await chrome.storage.local.get(['enableAiAnalysis']);
                 if (enableAiAnalysis) {
                     try {
                         showToast('AI分析中...', 'default');
@@ -710,19 +783,112 @@ async function showSettings() {
     elements.enableNotion.checked = destConfig.enableNotion;
 
     // AI分析設定を読み込み
-    const { enableAiAnalysis } = await chrome.storage.sync.get(['enableAiAnalysis']);
+    const { enableAiAnalysis } = await chrome.storage.local.get(['enableAiAnalysis']);
     elements.enableAiAnalysis.checked = enableAiAnalysis === true;
+
+    // 自動日報・Slack通知設定を読み込み
+    const alarmConfig = await chrome.storage.local.get(['enableDailyAlarm', 'alarmTime', 'enableSlackNotification', 'slackWebhookUrl']);
+    elements.enableDailyAlarm.checked = alarmConfig.enableDailyAlarm === true;
+    elements.enableSlackNotification.checked = alarmConfig.enableSlackNotification !== false; // デフォルトは互換性重視でON気味にするか、設定がなければundefined
+
+    // alarmTime は "HH:MM" 形式が望ましいが、旧データの number(例:18) にも対応させる
+    let timeVal = "18:00";
+    if (alarmConfig.alarmTime !== undefined) {
+        if (typeof alarmConfig.alarmTime === 'number') {
+            timeVal = alarmConfig.alarmTime.toString().padStart(2, '0') + ':00';
+        } else {
+            timeVal = alarmConfig.alarmTime;
+        }
+    }
+    elements.alarmTime.value = timeVal;
+    elements.slackWebhookUrl.value = alarmConfig.slackWebhookUrl || '';
+
+    // ウィザード設定（カスタムプロファイル）を読み込み
+    await loadAndRenderWizardProfiles();
 
     // 接続状態を更新
     updateConnectionStatus('sheets', sheetsConfig.spreadsheetId ? 'connected' : 'disconnected');
     updateConnectionStatus('notion', notionConfig.notionToken ? 'connected' : 'disconnected');
     updateConnectionStatus('gemini', geminiConfig.geminiApiKey ? 'connected' : 'disconnected');
+    updateConnectionStatus('slack', elements.slackWebhookUrl.value ? 'connected' : 'disconnected');
 
     elements.settingsModal.classList.remove('hidden');
 
     // カレンダー一覧を読み込み
     await loadCalendarList();
 }
+
+// ===== ウィザード設定管理 =====
+let wizardProfiles = []; // [{ category: '...', oneliners: ['...'] }]
+
+async function loadAndRenderWizardProfiles() {
+    const { wizardWorkProfile } = await chrome.storage.local.get(['wizardWorkProfile']);
+    // 'カテゴリ: 一言1, 一言2' の形式からパース
+    const lines = (wizardWorkProfile || '').split('\n').map(l => l.trim()).filter(Boolean);
+    wizardProfiles = lines.map(line => {
+        const parts = line.split(/[:：]/);
+        if (parts.length >= 2) {
+            const category = parts[0].trim();
+            const oneliners = parts.slice(1).join(':').split(/[,、]/).map(s => s.trim()).filter(Boolean);
+            return { category, oneliners };
+        }
+        return { category: line, oneliners: [] };
+    });
+    renderWizardProfiles();
+}
+
+function renderWizardProfiles() {
+    if (wizardProfiles.length === 0) {
+        elements.wizardProfileList.innerHTML = '<div class="empty-state-small">設定はありません</div>';
+        return;
+    }
+
+    elements.wizardProfileList.innerHTML = wizardProfiles.map((p, index) => `
+        <div class="group-item" style="padding: 8px; margin-bottom: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--border-radius); display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="flex: 1;">
+                <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px;">${escapeHtml(p.category)}</div>
+                <div style="font-size: 11px; color: var(--text-secondary);">${escapeHtml(p.oneliners.join(', '))}</div>
+            </div>
+            <button class="btn btn-icon btn-small delete-wizard-profile-btn" data-index="${index}" style="color: var(--color-error); padding: 4px;">✕</button>
+        </div>
+    `).join('');
+
+    // 削除ボタンのイベントリスナー
+    elements.wizardProfileList.querySelectorAll('.delete-wizard-profile-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.dataset.index, 10);
+            deleteWizardProfile(idx);
+        });
+    });
+}
+
+function handleAddWizardProfile() {
+    const category = elements.wizardProfileCategoryInput.value.trim();
+    const onelinerStr = elements.wizardProfileOnelinersInput.value.trim();
+
+    if (!category || !onelinerStr) {
+        showToast('業務名と一言を入力してください', 'error');
+        return;
+    }
+
+    const oneliners = onelinerStr.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+    if (oneliners.length === 0) {
+        showToast('一言を入力してください', 'error');
+        return;
+    }
+
+    wizardProfiles.push({ category, oneliners });
+    elements.wizardProfileCategoryInput.value = '';
+    elements.wizardProfileOnelinersInput.value = '';
+    renderWizardProfiles();
+    showToast('リストに追加しました（保存ボタンで確定します）', 'success');
+}
+
+function deleteWizardProfile(index) {
+    wizardProfiles.splice(index, 1);
+    renderWizardProfiles();
+}
+// =============================
 
 // カレンダー一覧を読み込んで表示
 async function loadCalendarList() {
@@ -749,11 +915,15 @@ async function loadCalendarList() {
                 return `
                     <label class="calendar-item">
                         <input type="checkbox" value="${cal.id}" ${isChecked ? 'checked' : ''}>
-                        <span class="calendar-color" style="background-color: ${color}"></span>
-                        <span class="calendar-name">${cal.summary}</span>
+                        <span class="calendar-color" data-color="${color}"></span>
+                        <span class="calendar-name">${escapeHtml(cal.summary)}</span>
                     </label>
                 `;
             }).join('');
+
+        elements.calendarList.querySelectorAll('.calendar-color[data-color]').forEach(el => {
+            el.style.backgroundColor = el.dataset.color;
+        });
 
     } catch (error) {
         console.error('カレンダー一覧の取得に失敗:', error);
@@ -863,11 +1033,81 @@ async function handleTestSheets() {
   `;
 }
 
+async function handleTestSlack() {
+    elements.testSlackBtn.disabled = true;
+    elements.testSlackBtn.textContent = 'テスト中...';
+
+    const webhookUrl = elements.slackWebhookUrl.value.trim();
+
+    if (!webhookUrl) {
+        showToast('Slack Webhook URLを入力してください', 'error');
+        elements.testSlackBtn.disabled = false;
+        elements.testSlackBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      接続テスト
+    `;
+        return;
+    }
+
+    try {
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            body: JSON.stringify({ text: 'Daily Report AI: Slack接続テスト成功！' }),
+        });
+
+        if (response.ok) {
+            updateConnectionStatus('slack', 'connected', '接続成功');
+            showToast('Slackに接続しました', 'success');
+        } else {
+            const errorText = await response.text();
+            updateConnectionStatus('slack', 'error', `接続失敗: ${response.status} ${errorText}`);
+            showToast(`Slack接続エラー: ${response.status} ${errorText}`, 'error');
+        }
+    } catch (error) {
+        updateConnectionStatus('slack', 'error', `接続失敗: ${error.message}`);
+        showToast(`Slack接続エラー: ${error.message}`, 'error');
+    } finally {
+        elements.testSlackBtn.disabled = false;
+        elements.testSlackBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      接続テスト
+    `;
+    }
+}
+
+async function handleGenerateDailySlack() {
+    elements.generateDailySlackBtn.disabled = true;
+    const originalText = elements.generateDailySlackBtn.innerHTML;
+    elements.generateDailySlackBtn.textContent = '生成＆送信中...';
+    showToast('Slackへの日報送信リクエストを開始しました...', 'info');
+
+    try {
+        const response = await chrome.runtime.sendMessage({ action: 'generateDailySlack' });
+        if (response && response.success) {
+            showToast('本日の日報をSlackへ送信しました', 'success');
+        } else {
+            showToast(`送信に失敗しました: ${response ? response.error : '不明なエラー'}`, 'error');
+        }
+    } catch (e) {
+        showToast(`送信エラー: ${e.message}`, 'error');
+    } finally {
+        elements.generateDailySlackBtn.disabled = false;
+        elements.generateDailySlackBtn.innerHTML = originalText;
+    }
+}
+
 function updateConnectionStatus(type, status, message) {
     let statusEl;
     if (type === 'sheets') statusEl = elements.sheetsStatus;
     else if (type === 'notion') statusEl = elements.notionStatus;
     else if (type === 'gemini') statusEl = elements.geminiStatus;
+    else if (type === 'slack') statusEl = elements.slackStatus;
     else return;
 
     const iconEl = statusEl.querySelector('.status-icon');
@@ -897,6 +1137,12 @@ async function handleSaveSettings() {
     const enableNotion = elements.enableNotion.checked;
     const enableAiAnalysis = elements.enableAiAnalysis.checked;
 
+    // 自動日報・通知設定
+    const enableDailyAlarm = elements.enableDailyAlarm.checked;
+    const alarmTime = elements.alarmTime.value || '18:00';
+    const enableSlackNotification = elements.enableSlackNotification.checked;
+    const slackWebhookUrl = elements.slackWebhookUrl.value.trim();
+
     // バリデーション
     if (enableSheets && !spreadsheetId) {
         showToast('スプレッドシートIDを入力してください', 'error');
@@ -918,7 +1164,22 @@ async function handleSaveSettings() {
     await saveNotionConfig(notionToken, notionDatabaseId);
     await saveGeminiConfig(geminiApiKey);
     await saveDestinationConfig(enableSheets, enableNotion);
-    await chrome.storage.sync.set({ enableAiAnalysis });
+    await chrome.storage.local.set({
+        enableAiAnalysis,
+        enableDailyAlarm,
+        alarmTime,
+        enableSlackNotification,
+        slackWebhookUrl
+    });
+
+    // バックグラウンドに設定変更を通知（アラームの再設定を促す）
+    chrome.runtime.sendMessage({ action: 'updateAlarms' });
+
+    // wizardProfiles を文字列形式に戻して保存
+    const wizardWorkProfile = wizardProfiles
+        .map(p => `${p.category}: ${p.oneliners.join(', ')}`)
+        .join('\n');
+    await chrome.storage.local.set({ wizardWorkProfile });
 
     // カレンダー選択を保存
     const calendarCheckboxes = elements.calendarList.querySelectorAll('input[type="checkbox"]:checked');
@@ -975,6 +1236,7 @@ async function handleTestGemini() {
 // AI分析の実行
 async function runAiAnalysis(reportData) {
     const summaryData = {
+        period: 'daily',
         date: reportData.date,
         userEmail: reportData.userEmail,
         totalEvents: reportData.scheduleEntries.length,
@@ -986,6 +1248,7 @@ async function runAiAnalysis(reportData) {
         aiNotUsingMinutes: 0,
         aiPotentialMinutes: 0,
         avgRate: 0,
+        totalTime: reportData.totalWorkHours,
         entries: reportData.scheduleEntries
     };
 
@@ -1022,21 +1285,17 @@ function calculateEntryMinutes(entry) {
     try {
         const [startH, startM] = entry.start.split(':').map(Number);
         const [endH, endM] = entry.end.split(':').map(Number);
-        return (endH * 60 + endM) - (startH * 60 + startM);
+        const startTotal = startH * 60 + startM;
+        const endTotal = endH * 60 + endM;
+        return (endTotal >= startTotal) ? (endTotal - startTotal) : ((endTotal + 24 * 60) - startTotal);
     } catch {
         return 0;
     }
 }
 
 function showAiAnalysis(analysisText) {
-    // マークダウンを簡易的にHTMLに変換
-    const html = analysisText
-        .replace(/## (.+)/g, '<h3>$1</h3>')
-        .replace(/### (.+)/g, '<h4>$1</h4>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n- /g, '<br>• ')
-        .replace(/\n\n/g, '<br><br>')
-        .replace(/\n/g, '<br>');
+    // マークダウンを簡易的にHTMLに変換 (XSS対策済み)
+    const html = markdownToSafeHtml(analysisText);
 
     elements.aiAnalysisContent.innerHTML = html;
     elements.aiAnalysisModal.classList.remove('hidden');
@@ -1069,7 +1328,8 @@ function showToast(message, type = 'default') {
 // ダッシュボード表示
 async function showDashboard() {
     elements.dashboardModal.classList.remove('hidden');
-    elements.dashboardReportSection.style.display = 'none';
+    elements.dashboardReportSectionWeekly.style.display = 'none';
+    elements.dashboardReportSectionMonthly.style.display = 'none';
 
     // サマリーをデフォルト（日別）で表示
     await updateSummaryStats('daily');
@@ -1096,6 +1356,9 @@ async function showDashboard() {
 // サマリー統計を期間別に更新
 async function updateSummaryStats(period) {
     const periodLabel = document.getElementById('summary-period-label');
+    const elImpactBar = document.getElementById('impact-stats-bar');
+    const elImpactTimeSaved = document.getElementById('impact-time-saved');
+    const elImpactHighScore = document.getElementById('impact-high-score');
 
     if (period === 'daily') {
         // 今日のデータ（currentEventsから）
@@ -1135,6 +1398,37 @@ async function updateSummaryStats(period) {
             elements.statAiUsing.textContent = '-';
             elements.statAiRate.textContent = '-';
         }
+
+        // 本日分のAIインパクトログ（スコープ機能がない前提）
+        if (elImpactBar) {
+            const impactData = await fetchAiImpactData('personal');
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
+
+            let totalTimeSaved = 0;
+            let highScoreCount = 0;
+
+            impactData.forEach(row => {
+                const rDate = row.date.split('T')[0].replace(/-/g, '/');
+                if (rDate === todayStr || row.date.includes(todayStr)) {
+                    totalTimeSaved += (row.timeSaved || 0);
+                    if (row.impactScore && row.impactScore >= 4) {
+                        highScoreCount++;
+                    }
+                }
+            });
+
+            if (totalTimeSaved > 0 || highScoreCount > 0) {
+                elImpactBar.style.display = 'flex';
+                const sHours = Math.floor(totalTimeSaved / 60);
+                const sMins = totalTimeSaved % 60;
+                elImpactTimeSaved.textContent = sHours > 0 ? `${sHours}時間${sMins}分` : `${sMins}分`;
+                elImpactHighScore.textContent = `${highScoreCount}件`;
+            } else {
+                elImpactBar.style.display = 'none';
+            }
+        }
+
     } else {
         // 週別・月別はDailySummaryシートから集計
         const daysAgo = period === 'weekly' ? 7 : 30;
@@ -1178,6 +1472,34 @@ async function updateSummaryStats(period) {
             elements.statAiUsing.textContent = '-';
             elements.statAiRate.textContent = '-';
         }
+
+        // 期間分のAIインパクトログ（スコープ対応必要なら追加）
+        if (elImpactBar) {
+            const impactData = await fetchAiImpactData('personal'); // FIXME: if dashboard has scopes later
+            let totalTimeSaved = 0;
+            let highScoreCount = 0;
+
+            impactData.forEach(row => {
+                if (!row.date) return;
+                const rDate = new Date(row.date);
+                if (rDate >= startDate && rDate <= now) {
+                    totalTimeSaved += (row.timeSaved || 0);
+                    if (row.impactScore && row.impactScore >= 4) {
+                        highScoreCount++;
+                    }
+                }
+            });
+
+            if (totalTimeSaved > 0 || highScoreCount > 0) {
+                elImpactBar.style.display = 'flex';
+                const sHours = Math.floor(totalTimeSaved / 60);
+                const sMins = totalTimeSaved % 60;
+                elImpactTimeSaved.textContent = sHours > 0 ? `${sHours}時間${sMins}分` : `${sMins}分`;
+                elImpactHighScore.textContent = `${highScoreCount}件`;
+            } else {
+                elImpactBar.style.display = 'none';
+            }
+        }
     }
 }
 
@@ -1187,7 +1509,7 @@ let aiTimeChartInstance = null;
 // DailySummaryシートからデータを取得
 async function fetchDailySummaryData() {
     try {
-        const { spreadsheetId } = await chrome.storage.sync.get(['spreadsheetId']);
+        const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
         if (!spreadsheetId || !authToken) return [];
 
         const sheetName = 'DailySummary';
@@ -1389,7 +1711,7 @@ function aggregateChartData(data, period) {
 // CalendarSummaryシートからデータを取得
 async function fetchCalendarSummaryData() {
     try {
-        const { spreadsheetId } = await chrome.storage.sync.get(['spreadsheetId']);
+        const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
         if (!spreadsheetId || !authToken) return [];
 
         const sheetName = 'CalendarSummary';
@@ -1469,7 +1791,7 @@ async function renderCalendarRanking() {
         const badgeClass = rank <= 3 ? `rank-${rank}` : 'rank-other';
         html += `<tr>
             <td><span class="rank-badge ${badgeClass}">${rank}</span></td>
-            <td>${cal.name}</td>
+            <td>${escapeHtml(cal.name)}</td>
             <td>${cal.events}件<span style="color:var(--text-tertiary);font-size:11px"> / ${cal.days}日</span></td>
             <td><div class="rate-bar">
                 <div class="rate-bar-track"><div class="rate-bar-fill" style="width:${cal.aiRate}%"></div></div>
@@ -1497,7 +1819,7 @@ async function generateReport(type) {
     btn.innerHTML = `<span class="loading-spinner"></span> ${type === 'weekly' ? '週次' : '月次'}レポート生成中...`;
 
     try {
-        const { geminiApiKey } = await chrome.storage.sync.get(['geminiApiKey']);
+        const { geminiApiKey } = await chrome.storage.local.get(['geminiApiKey']);
         if (!geminiApiKey) {
             showToast('Gemini API Keyが設定されていません。設定画面から設定してください。', 'error');
             return;
@@ -1518,20 +1840,14 @@ async function generateReport(type) {
             }
         }
 
-        // 結果を表示
-        const html = analysis
-            .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-            .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-            .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/^\d+\. /gm, (match) => '<br>' + match)
-            .replace(/^- /gm, '• ')
-            .replace(/\n- /g, '<br>• ')
-            .replace(/\n\n/g, '<br><br>')
-            .replace(/\n/g, '<br>');
+        // 結果を表示 (XSS対策済み)
+        const html = markdownToSafeHtml(analysis);
 
-        elements.dashboardReportContent.innerHTML = html;
-        elements.dashboardReportSection.style.display = 'block';
+        const reportContent = type === 'weekly' ? elements.dashboardReportContentWeekly : elements.dashboardReportContentMonthly;
+        const reportSection = type === 'weekly' ? elements.dashboardReportSectionWeekly : elements.dashboardReportSectionMonthly;
+
+        reportContent.innerHTML = html;
+        reportSection.style.display = 'block';
 
         showToast(`${type === 'weekly' ? '週次' : '月次'}レポートを生成しました！`, 'success');
 
@@ -1541,6 +1857,65 @@ async function generateReport(type) {
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
+    }
+}
+
+// メインページ「AI分析レポート」セクション用
+async function generateQuickReport(type) {
+    const btnMap = { daily: elements.quickReportDaily, weekly: elements.quickReportWeekly, monthly: elements.quickReportMonthly };
+    const btn = btnMap[type];
+    const originalText = btn.textContent;
+
+    // ボタン無効化＋ローディング表示
+    Object.values(btnMap).forEach(b => { b.disabled = true; });
+    btn.textContent = '分析中...';
+    elements.quickReportResult.classList.remove('hidden');
+    elements.quickReportText.innerHTML = '<div class="report-loading"><div class="spinner-small"></div> 分析中...</div>';
+    elements.copyReportBtn.classList.add('hidden');
+
+    try {
+        const { geminiApiKey } = await chrome.storage.local.get(['geminiApiKey']);
+        if (!geminiApiKey) {
+            showToast('Gemini API Keyが設定されていません。設定画面から設定してください。', 'error');
+            elements.quickReportText.textContent = 'Gemini API Keyが未設定です。';
+            return;
+        }
+
+        let analysisHtml = '';
+
+        if (type === 'daily') {
+            // 日次: 現在表示中のスケジュールデータから分析
+            const previewData = generatePreviewData();
+            const reportData = {
+                userEmail: currentUser?.email || '',
+                date: previewData.dateFormatted,
+                totalWorkHours: previewData.totalTime,
+                scheduleEntries: previewData.entries
+            };
+            const result = await runAiAnalysis(reportData);
+            if (result.success) {
+                analysisHtml = markdownToSafeHtml(result.analysis);
+            } else {
+                analysisHtml = '<p>分析結果を取得できませんでした。</p>';
+            }
+        } else {
+            // 週次/月次: collectSummaryData + callGeminiForReport を再利用
+            const summaryData = await collectSummaryData(type);
+            const analysis = await callGeminiForReport(geminiApiKey, summaryData, type);
+            analysisHtml = markdownToSafeHtml(analysis);
+        }
+
+        elements.quickReportText.innerHTML = analysisHtml;
+        elements.copyReportBtn.classList.remove('hidden');
+        showToast(`${type === 'daily' ? '日次' : type === 'weekly' ? '週次' : '月次'}分析を生成しました`, 'success');
+
+    } catch (error) {
+        console.error('クイックレポートエラー:', error);
+        elements.quickReportText.textContent = `エラー: ${error.message}`;
+        showToast(`分析エラー: ${error.message}`, 'error');
+    } finally {
+        Object.values(btnMap).forEach(b => { b.disabled = false; });
+        btn.textContent = originalText;
     }
 }
 
@@ -1612,6 +1987,38 @@ async function collectSummaryData(type) {
         const totalEvents = totals.aiUsingCount + totals.aiNotUsingCount + totals.aiPotentialCount;
         const aiRate = totalEvents > 0 ? Math.round(totals.aiUsingCount / totalEvents * 100) : 0;
 
+        // --- AI Impact Log の取得 (オプション) ---
+        let impactText = '';
+        let aiTimeSaved = 0;
+        try {
+            const impactData = await fetchAiImpactData('personal'); // TODO: scope
+            if (impactData.length > 0) {
+                const mvps = [];
+                for (const row of impactData) {
+                    if (!row.date) continue;
+                    const d = new Date(row.date);
+                    if (isNaN(d.getTime()) || d < startDate || d > now) continue;
+
+                    const saved = row.timeSaved || 0;
+                    aiTimeSaved += saved;
+
+                    const score = row.impactScore || 0;
+                    if (score >= 4) {
+                        mvps.push({ task: row.task, score, action: row.valueCreation, time: saved });
+                    }
+                }
+                if (mvps.length > 0) {
+                    impactText = '\n## 高いインパクトを生んだ事例 (Impact MVP)\n' + mvps.map(m =>
+                        `  - タスク: ${m.task} (スコア: Lv${m.score}, 削減時間: ${m.time}分)\n    価値創造アクション: ${m.action}`
+                    ).join('\n');
+                }
+            }
+        } catch (e) {
+            console.warn('AI Impact Log取得エラー(レポート用 - 実データ枠):', e);
+        }
+
+        totals.aiTimeSaved = aiTimeSaved;
+
         return {
             period: { start: formatDate(startDate), end: formatDate(now), days: uniqueDays },
             totals,
@@ -1620,7 +2027,8 @@ async function collectSummaryData(type) {
                 dailyMinutes: Math.round(totals.totalMinutes / uniqueDays),
                 aiRate
             },
-            calendarSummary
+            calendarSummary,
+            impactText
         };
     }
 
@@ -1639,6 +2047,36 @@ async function collectSummaryData(type) {
         else aiNotUsingCount++;
     }
 
+    // --- AI Impact Log の取得 (オプション) ---
+    let impactText = '';
+    let aiTimeSaved = 0;
+    try {
+        const impactData = await fetchAiImpactData('personal');
+        if (impactData.length > 0) {
+            const mvps = [];
+            for (const row of impactData) {
+                if (!row.date) continue;
+                const d = new Date(row.date);
+                if (isNaN(d.getTime()) || d < startDate || d > now) continue;
+
+                const saved = row.timeSaved || 0;
+                aiTimeSaved += saved;
+
+                const score = row.impactScore || 0;
+                if (score >= 4) {
+                    mvps.push({ task: row.task, score, action: row.valueCreation, time: saved });
+                }
+            }
+            if (mvps.length > 0) {
+                impactText = '\n## 高いインパクトを生んだ事例 (Impact MVP)\n' + mvps.map(m =>
+                    `  - タスク: ${sanitizeForPrompt(m.task)} (スコア: Lv${m.score}, 削減時間: ${m.time}分)\n    価値創造アクション: ${sanitizeForPrompt(m.action)}`
+                ).join('\n');
+            }
+        }
+    } catch (e) {
+        console.warn('AI Impact Log取得エラー(レポート用):', e);
+    }
+
     return {
         period: { start: formatDate(startDate), end: formatDate(now), days: daysAgo },
         totals: {
@@ -1649,14 +2087,16 @@ async function collectSummaryData(type) {
             aiPotentialCount: aiPotentialCount * daysAgo,
             aiUsingMinutes: Math.round(totalMinutes * 0.3 * daysAgo),
             aiNotUsingMinutes: Math.round(totalMinutes * 0.5 * daysAgo),
-            aiPotentialMinutes: Math.round(totalMinutes * 0.2 * daysAgo)
+            aiPotentialMinutes: Math.round(totalMinutes * 0.2 * daysAgo),
+            aiTimeSaved: aiTimeSaved // 推定は0にして実データがある場合のみ上書き
         },
         averages: {
             dailyEvents: totalEvents,
             dailyMinutes: totalMinutes,
             aiRate: totalEvents > 0 ? Math.round((aiUsingCount / totalEvents) * 100) : 0
         },
-        calendarSummary
+        calendarSummary,
+        impactText
     };
 }
 
@@ -1681,7 +2121,7 @@ async function callGeminiForReport(apiKey, summaryData, type) {
 - AI未活用: ${summaryData.totals.aiNotUsingCount}件（${Math.round(summaryData.totals.aiNotUsingMinutes / 60)}h）
 - AI余地あり: ${summaryData.totals.aiPotentialCount}件（${Math.round(summaryData.totals.aiPotentialMinutes / 60)}h）
 - AI活用率: ${summaryData.averages.aiRate}%
-${calendarText}
+- 今期AIによる全体の削減時間: ${Math.round((summaryData.totals.aiTimeSaved || 0) / 60)}h${summaryData.calendarSummary && summaryData.calendarSummary.length > 0 ? '\n' + calendarText : ''}${summaryData.impactText ? '\n' + summaryData.impactText : ''}
 
 ## 回答フォーマット（必ずこの構造で出力せよ）
 
@@ -1736,3 +2176,89 @@ ${calendarText}
     return text;
 }
 
+// AiImpactLogシートからデータを取得
+async function fetchAiImpactData(scope = 'personal') {
+    try {
+        const { spreadsheetId, directorySpreadsheetId } = await chrome.storage.local.get(['spreadsheetId', 'directorySpreadsheetId']);
+        if (!spreadsheetId || !authToken) return [];
+
+        const targetConfig = {};
+
+        if (scope === 'personal') {
+            targetConfig[spreadsheetId] = [currentUser.email.toLowerCase()];
+        } else if (scope.startsWith('group-')) {
+            const groupId = scope.replace('group-', '');
+            const group = dashboardGroups.find(g => g.id === groupId);
+
+            if (group) {
+                const members = group.members.map(m => m.trim().toLowerCase());
+                let directoryMap = {};
+                if (directorySpreadsheetId) {
+                    directoryMap = await fetchDirectoryData(directorySpreadsheetId);
+                }
+
+                members.forEach(email => {
+                    let targetSheetId;
+                    if (email === currentUser.email.toLowerCase()) {
+                        targetSheetId = spreadsheetId;
+                    } else {
+                        targetSheetId = directoryMap[email] || (directorySpreadsheetId ? null : spreadsheetId);
+                    }
+
+                    if (targetSheetId) {
+                        if (!targetConfig[targetSheetId]) {
+                            targetConfig[targetSheetId] = [];
+                        }
+                        targetConfig[targetSheetId].push(email);
+                    }
+                });
+            }
+        }
+
+        const fetchPromises = Object.entries(targetConfig).map(async ([sId, targetEmails]) => {
+            if (!sId) return [];
+
+            const sheetName = 'AiImpactLog';
+            const range = `${sheetName}!A:H`;
+            const encodedRange = encodeURIComponent(range);
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${sId}/values/${encodedRange}`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) return [];
+
+                const data = await response.json();
+                const values = data.values || [];
+                if (values.length <= 1) return [];
+
+                return values.slice(1).filter(row => {
+                    const rowUser = (row[1] || '').trim().toLowerCase();
+                    return targetEmails.includes(rowUser);
+                }).map(row => ({
+                    date: row[0] || '',
+                    user: row[1] || '',
+                    task: row[2] || '',
+                    tool: row[3] || '',
+                    oneliner: row[4] || '',
+                    impactScore: parseInt(row[5]) || null,
+                    timeSaved: parseInt(row[6]) || 0,
+                    valueCreation: row[7] || ''
+                }));
+
+            } catch (e) {
+                console.warn(`シート(${sId})のAiImpactLog取得エラー:`, e);
+                return [];
+            }
+        });
+
+        const results = await Promise.all(fetchPromises);
+        return results.flat();
+
+    } catch (e) {
+        console.error('AiImpactLogデータ取得エラー:', e);
+        return [];
+    }
+}

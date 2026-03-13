@@ -2,15 +2,19 @@
 
 /**
  * Google OAuth認証を実行してトークンを取得
+ * @param {boolean} interactive インタラクティブなログインプロンプトを表示するか
  * @returns {Promise<string>} アクセストークン
  */
-export async function getAuthToken() {
+export async function getAuthToken(interactive = true) {
     return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: 'getAuthToken' }, (response) => {
-            if (response.success) {
+        chrome.runtime.sendMessage({ action: 'getAuthToken', interactive }, (response) => {
+            if (chrome.runtime.lastError) {
+                return reject(new Error('通信エラーが発生しました。時間を置いて再度お試しください (' + chrome.runtime.lastError.message + ')'));
+            }
+            if (response && response.success) {
                 resolve(response.token);
             } else {
-                reject(new Error(response.error));
+                reject(new Error(response?.error || '認証メッセージの送信に失敗しました'));
             }
         });
     });
@@ -23,10 +27,13 @@ export async function getAuthToken() {
 export async function revokeToken() {
     return new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({ action: 'revokeToken' }, (response) => {
-            if (response.success) {
+            if (chrome.runtime.lastError) {
+                return reject(new Error('通信エラーが発生しました。時間を置いて再度お試しください (' + chrome.runtime.lastError.message + ')'));
+            }
+            if (response && response.success) {
                 resolve();
             } else {
-                reject(new Error(response.error));
+                reject(new Error(response?.error || '認証解除メッセージの送信に失敗しました'));
             }
         });
     });
@@ -58,7 +65,9 @@ export async function getUserInfo(token) {
  */
 export async function validateToken(token) {
     try {
-        const response = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`);
+        const response = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         return response.ok;
     } catch {
         return false;

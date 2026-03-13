@@ -7,10 +7,14 @@
     "identity",
     "storage",
     "sidePanel",
-    "activeTab",
     "alarms",
-    "notifications"
+    "notifications",
+    "tabs",
+    "idle"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
+  },
   "oauth2": {
     "client_id": "833888816532-9sa6e0heqadbfs4hfhtl8671ph7fepif.apps.googleusercontent.com",
     "scopes": [

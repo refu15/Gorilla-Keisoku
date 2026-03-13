@@ -16,7 +16,7 @@ async function notionRequest(url, method, headers, body) {
  * Notionデータベースに日報を保存
  */
 export async function saveToNotion(reportData) {
-    const { notionToken, notionDatabaseId } = await chrome.storage.sync.get(['notionToken', 'notionDatabaseId']);
+    const { notionToken, notionDatabaseId } = await chrome.storage.local.get(['notionToken', 'notionDatabaseId']);
 
     if (!notionToken || !notionDatabaseId) {
         throw new Error('Notion設定が完了していません。設定画面から設定してください。');
@@ -149,7 +149,7 @@ function getAIFlagLabel(flag) {
  * Notion接続テスト
  */
 export async function testNotionConnection() {
-    const { notionToken, notionDatabaseId } = await chrome.storage.sync.get(['notionToken', 'notionDatabaseId']);
+    const { notionToken, notionDatabaseId } = await chrome.storage.local.get(['notionToken', 'notionDatabaseId']);
 
     if (!notionToken || !notionDatabaseId) {
         return { success: false, error: 'トークンまたはデータベースIDが設定されていません' };
@@ -178,30 +178,90 @@ export async function testNotionConnection() {
  * Notion設定の保存
  */
 export async function saveNotionConfig(token, databaseId) {
-    await chrome.storage.sync.set({ notionToken: token, notionDatabaseId: databaseId });
+    await chrome.storage.local.set({ notionToken: token, notionDatabaseId: databaseId });
 }
 
 /**
  * Notion設定の取得
  */
 export async function getNotionConfig() {
-    return chrome.storage.sync.get(['notionToken', 'notionDatabaseId']);
+    return chrome.storage.local.get(['notionToken', 'notionDatabaseId']);
 }
 
 /**
  * 送信先設定の保存
  */
 export async function saveDestinationConfig(enableSheets, enableNotion) {
-    await chrome.storage.sync.set({ enableSheets, enableNotion });
+    await chrome.storage.local.set({ enableSheets, enableNotion });
 }
 
 /**
  * 送信先設定の取得
  */
 export async function getDestinationConfig() {
-    const config = await chrome.storage.sync.get(['enableSheets', 'enableNotion']);
+    const config = await chrome.storage.local.get(['enableSheets', 'enableNotion']);
     return {
         enableSheets: config.enableSheets !== false,
         enableNotion: config.enableNotion === true
     };
+}
+
+// ========================================
+// Wizard Reports Notion保存 (ウィザード連携)
+// ========================================
+
+/**
+ * ウィザードの日報テキストをNotionに保存
+ * @param {string} reportText 日報テキスト
+ * @param {string} dateStr 対象日付文字列
+ * @returns {Promise<Object>} 保存結果
+ */
+export async function saveWizardToNotion(reportText, dateStr) {
+    const { notionToken, notionDatabaseId } = await chrome.storage.local.get(['notionToken', 'notionDatabaseId']);
+
+    if (!notionToken || !notionDatabaseId) {
+        throw new Error('Notion設定が完了していません。設定画面から設定してください。');
+    }
+
+    const url = 'https://api.notion.com/v1/pages';
+
+    const headers = {
+        'Authorization': `Bearer ${notionToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+    };
+
+    const pageTitle = `【Wizard】${dateStr} 日報`;
+
+    // 改行で区切ってパラグラフブロックにする（2000文字制限対策）
+    const paragraphs = reportText.split('\n\n').filter(text => text.trim() !== '');
+    const contentBlocks = paragraphs.map(text => {
+        // 万が一1段落が2000文字を超える場合は切り取る
+        const safeText = text.length > 2000 ? text.substring(0, 1997) + '...' : text;
+        return {
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+                rich_text: [{ type: 'text', text: { content: safeText } }]
+            }
+        };
+    });
+
+    const body = {
+        parent: { database_id: notionDatabaseId },
+        properties: {
+            '名前': {
+                title: [{ text: { content: pageTitle } }]
+            }
+        },
+        children: contentBlocks.slice(0, 100) // 100ブロック上限
+    };
+
+    const result = await notionRequest(url, 'POST', headers, body);
+
+    if (!result.success) {
+        throw new Error(result.error);
+    }
+
+    return { success: true, pageId: result.data?.id };
 }

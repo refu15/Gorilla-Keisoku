@@ -16,7 +16,17 @@ export async function addToQueue(data) {
     };
 
     offlineQueue.push(item);
-    await chrome.storage.local.set({ offlineQueue });
+
+    // キューサイズ上限: 100件を超えた場合は古いアイテムを削除
+    const MAX_QUEUE_SIZE = 100;
+    const trimmed = offlineQueue.length > MAX_QUEUE_SIZE
+        ? offlineQueue.slice(offlineQueue.length - MAX_QUEUE_SIZE)
+        : offlineQueue;
+    if (offlineQueue.length > MAX_QUEUE_SIZE) {
+        console.warn(`オフラインキュー上限(${MAX_QUEUE_SIZE}件)を超えたため古いアイテムを削除しました`);
+    }
+
+    await chrome.storage.local.set({ offlineQueue: trimmed });
 
     return item.id;
 }
@@ -64,7 +74,7 @@ export async function retryQueue() {
  * @returns {string} ID
  */
 function generateId() {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return crypto.randomUUID();
 }
 
 /**

@@ -1,20 +1,36 @@
 // Google Sheets API連携モジュール
 
 /**
+ * シート名のバリデーション
+ * Google Sheets APIで使用不可の文字やURL操作可能な文字をブロック
+ * @param {string} name シート名
+ * @returns {string} 安全なシート名（不正な場合は'Sheet1'を返す）
+ */
+function sanitizeSheetName(name) {
+    if (!name || typeof name !== 'string') return 'Sheet1';
+    // Google Sheets API: シート名にはある程度の記号も使えるが、単一引用符等のエスケープが必要になる場合がある。
+    // 今回のエラーは全角文字を弾いているわけではないが、[\\/*?\[\]':!] 等の記号が含まれるとSheet1になる。
+    // 日本語のシート名（例：シート１）がそのまま通るように、サニタイズ処理を緩めるか、URLエンコードに任せる。
+    if (name.length > 100) return 'Sheet1';
+    // 不正な文字を置換して返す（Sheet1で上書きしない）
+    return name.replace(/[\\/*?\[\]':!]/g, '_');
+}
+/**
  * 日報データをスプレッドシートに保存
  * @param {string} token アクセストークン
  * @param {Object} reportData 日報データ
  * @returns {Promise<Object>} 保存結果
  */
 export async function saveReport(token, reportData) {
-    const { spreadsheetId, sheetName } = await chrome.storage.sync.get(['spreadsheetId', 'sheetName']);
+    const { spreadsheetId, sheetName } = await chrome.storage.local.get(['spreadsheetId', 'sheetName']);
 
     if (!spreadsheetId) {
         throw new Error('スプレッドシートIDが設定されていません。設定画面から設定してください。');
     }
 
-    const range = `${sheetName || 'Sheet1'}!A:J`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
+    const range = `'${sanitizeSheetName(sheetName)}'!A:J`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
 
     // 日報データをスプレッドシート用の行に変換
     const rows = formatReportForSheet(reportData);
@@ -71,36 +87,53 @@ function formatReportForSheet(reportData) {
  * @returns {Promise<void>}
  */
 export async function ensureHeaders(token) {
-    const { spreadsheetId, sheetName } = await chrome.storage.sync.get(['spreadsheetId', 'sheetName']);
+    const { spreadsheetId, sheetName } = await chrome.storage.local.get(['spreadsheetId', 'sheetName']);
 
     if (!spreadsheetId) {
         throw new Error('スプレッドシートIDが設定されていません');
     }
 
-    const range = `${sheetName || 'Sheet1'}!A1:J1`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const safeSheetName = sanitizeSheetName(sheetName);
+    const range = `'${safeSheetName}'!A1:J1`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
 
-    // 現在のヘッダーを確認
-    const response = await fetch(url, {
-        headers: {
-            'Authorization': `Bearer ${token}`
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            await createSheet(token, spreadsheetId, safeSheetName);
         }
-    });
 
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'スプレッドシートの読み取りに失敗しました');
-    }
+        let data = { values: [] };
+        if (response.ok) {
+            data = await response.json();
+        }
 
-    const data = await response.json();
+        if (!data.values || data.values.length === 0) {
+            const headers = [
+                ['ユーザーメール', '日付', '予定タイトル', '開始時刻', '終了時刻', 'カレンダー', 'AI活用フラグ', '活用率(%)', 'メモ', '送信日時']
+            ];
 
-    // ヘッダーが存在しない場合は作成
-    if (!data.values || data.values.length === 0) {
+            await fetch(`${url}?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: headers })
+            });
+        }
+    } catch (error) {
+        await createSheet(token, spreadsheetId, safeSheetName);
+
         const headers = [
             ['ユーザーメール', '日付', '予定タイトル', '開始時刻', '終了時刻', 'カレンダー', 'AI活用フラグ', '活用率(%)', 'メモ', '送信日時']
         ];
 
-        await fetch(`${url}?valueInputOption=RAW`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}?valueInputOption=RAW`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -117,8 +150,8 @@ export async function ensureHeaders(token) {
  * @param {string} sheetName シート名
  * @returns {Promise<void>}
  */
-export async function saveSpreadsheetConfig(spreadsheetId, sheetName = 'Sheet1') {
-    await chrome.storage.sync.set({ spreadsheetId, sheetName });
+export async function saveSpreadsheetConfig(spreadsheetId, sheetName = 'Sheet1', directorySpreadsheetId = '') {
+    await chrome.storage.local.set({ spreadsheetId, sheetName, directorySpreadsheetId });
 }
 
 /**
@@ -126,7 +159,12 @@ export async function saveSpreadsheetConfig(spreadsheetId, sheetName = 'Sheet1')
  * @returns {Promise<Object>} 設定オブジェクト
  */
 export async function getSpreadsheetConfig() {
-    return chrome.storage.sync.get(['spreadsheetId', 'sheetName']);
+    const result = await chrome.storage.local.get(['spreadsheetId', 'sheetName', 'directorySpreadsheetId']);
+    return {
+        spreadsheetId: result.spreadsheetId || '',
+        sheetName: result.sheetName || 'Sheet1',
+        directorySpreadsheetId: result.directorySpreadsheetId || ''
+    };
 }
 
 /**
@@ -135,7 +173,7 @@ export async function getSpreadsheetConfig() {
  * @returns {Promise<Object>} テスト結果
  */
 export async function testSpreadsheetConnection(token) {
-    const { spreadsheetId, sheetName } = await chrome.storage.sync.get(['spreadsheetId', 'sheetName']);
+    const { spreadsheetId, sheetName } = await chrome.storage.local.get(['spreadsheetId', 'sheetName']);
 
     if (!spreadsheetId) {
         return { success: false, error: 'スプレッドシートIDが設定されていません' };
@@ -160,7 +198,7 @@ export async function testSpreadsheetConnection(token) {
         const data = await response.json();
         const spreadsheetTitle = data.properties?.title || 'Untitled';
         const sheets = data.sheets?.map(s => s.properties?.title) || [];
-        const targetSheet = sheetName || 'Sheet1';
+        const targetSheet = sanitizeSheetName(sheetName);
         const sheetExists = sheets.includes(targetSheet);
 
         return {
@@ -185,7 +223,7 @@ export async function testSpreadsheetConnection(token) {
  * @returns {Promise<Object>} 更新結果
  */
 export async function updateDailySummary(token, reportData) {
-    const { spreadsheetId } = await chrome.storage.sync.get(['spreadsheetId']);
+    const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
 
     if (!spreadsheetId) {
         throw new Error('スプレッドシートIDが設定されていません');
@@ -209,8 +247,9 @@ export async function updateDailySummary(token, reportData) {
  * サマリーシートのヘッダーを確認・作成
  */
 async function ensureSummaryHeaders(token, spreadsheetId, sheetName) {
-    const range = `${sheetName}!A1:L1`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const range = `'${sheetName}'!A1:L1`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
 
     try {
         const response = await fetch(url, {
@@ -270,7 +309,7 @@ async function ensureSummaryHeaders(token, spreadsheetId, sheetName) {
             '更新日時'
         ]];
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:L1?valueInputOption=RAW`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:L1?valueInputOption=RAW`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -323,7 +362,7 @@ function calculateDailySummary(reportData) {
         const duration = calculateDurationMinutes(entry.start, entry.end);
         totalMinutes += duration;
 
-        if (entry.aiFlag === 'yes-using') {
+        if (entry.aiFlag === 'yes-using' || entry.aiFlag === 'yes-failed') {
             aiUsingCount++;
             aiUsingMinutes += duration;
             totalRate += entry.aiRate;
@@ -374,8 +413,9 @@ function calculateDurationMinutes(startStr, endStr) {
  * サマリー行を更新または挿入（同日・同ユーザーがあれば更新）
  */
 async function upsertSummaryRow(token, spreadsheetId, sheetName, newRow) {
-    const range = `${sheetName}!A:B`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const range = `'${sheetName}'!A:B`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
 
     const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -404,8 +444,9 @@ async function upsertSummaryRow(token, spreadsheetId, sheetName, newRow) {
 
     if (rowIndex > 0) {
         // 既存行を更新
-        const updateRange = `${sheetName}!A${rowIndex}:L${rowIndex}`;
-        const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`;
+        const updateRange = `'${sheetName}'!A${rowIndex}:L${rowIndex}`;
+        const encodedUpdateRange = encodeURIComponent(updateRange);
+        const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedUpdateRange}?valueInputOption=USER_ENTERED`;
 
         await fetch(updateUrl, {
             method: 'PUT',
@@ -425,8 +466,9 @@ async function upsertSummaryRow(token, spreadsheetId, sheetName, newRow) {
  * サマリー行を追加
  */
 async function appendSummaryRow(token, spreadsheetId, sheetName, row) {
-    const range = `${sheetName}!A:L`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
+    const range = `'${sheetName}'!A:L`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
 
     await fetch(url, {
         method: 'POST',
@@ -449,7 +491,7 @@ async function appendSummaryRow(token, spreadsheetId, sheetName, row) {
  * @returns {Promise<Object>} 更新結果
  */
 export async function updateCalendarSummary(token, reportData) {
-    const { spreadsheetId } = await chrome.storage.sync.get(['spreadsheetId']);
+    const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
 
     if (!spreadsheetId) {
         throw new Error('スプレッドシートIDが設定されていません');
@@ -483,8 +525,9 @@ export async function updateCalendarSummary(token, reportData) {
  * CalendarSummaryシートのヘッダーを確認・作成
  */
 async function ensureCalendarSummaryHeaders(token, spreadsheetId, sheetName) {
-    const range = `${sheetName}!A1:M1`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const range = `'${sheetName}'!A1:M1`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
 
     try {
         const response = await fetch(url, {
@@ -532,7 +575,7 @@ async function ensureCalendarSummaryHeaders(token, spreadsheetId, sheetName) {
             'AI活用時間(分)', 'AI未活用時間(分)', 'AI活用可能時間(分)', '更新日時'
         ]];
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:M1?valueInputOption=RAW`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:M1?valueInputOption=RAW`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -561,7 +604,7 @@ function calculateCalendarSummaryRow(date, userEmail, calendarName, entries) {
         const duration = calculateDurationMinutes(entry.start, entry.end);
         totalMinutes += duration;
 
-        if (entry.aiFlag === 'yes-using') {
+        if (entry.aiFlag === 'yes-using' || entry.aiFlag === 'yes-failed') {
             aiUsingCount++;
             aiUsingMinutes += duration;
             totalRate += entry.aiRate;
@@ -600,8 +643,9 @@ function calculateCalendarSummaryRow(date, userEmail, calendarName, entries) {
  * CalendarSummary行を更新または挿入（同日・同ユーザー・同カレンダー）
  */
 async function upsertCalendarSummaryRow(token, spreadsheetId, sheetName, newRow) {
-    const range = `${sheetName}!A:C`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const range = `'${sheetName}'!A:C`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
 
     const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -628,8 +672,9 @@ async function upsertCalendarSummaryRow(token, spreadsheetId, sheetName, newRow)
     }
 
     if (rowIndex > 0) {
-        const updateRange = `${sheetName}!A${rowIndex}:M${rowIndex}`;
-        const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`;
+        const updateRange = `'${sheetName}'!A${rowIndex}:M${rowIndex}`;
+        const encodedUpdateRange = encodeURIComponent(updateRange);
+        const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedUpdateRange}?valueInputOption=USER_ENTERED`;
 
         await fetch(updateUrl, {
             method: 'PUT',
@@ -648,8 +693,9 @@ async function upsertCalendarSummaryRow(token, spreadsheetId, sheetName, newRow)
  * CalendarSummary行を追加
  */
 async function appendCalendarSummaryRow(token, spreadsheetId, sheetName, row) {
-    const range = `${sheetName}!A:M`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
+    const range = `'${sheetName}'!A:M`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
 
     await fetch(url, {
         method: 'POST',
@@ -674,7 +720,7 @@ async function appendCalendarSummaryRow(token, spreadsheetId, sheetName, row) {
  * @returns {Promise<Object>} 保存結果
  */
 export async function saveReportToSheet(token, type, summary, analysis) {
-    const { spreadsheetId } = await chrome.storage.sync.get(['spreadsheetId']);
+    const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
 
     if (!spreadsheetId) {
         throw new Error('スプレッドシートIDが設定されていません');
@@ -702,8 +748,9 @@ export async function saveReportToSheet(token, type, summary, analysis) {
     ];
 
     // シートに追加
-    const range = `${sheetName}!A:L`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
+    const range = `'${sheetName}'!A:L`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
 
     await fetch(url, {
         method: 'POST',
@@ -721,8 +768,9 @@ export async function saveReportToSheet(token, type, summary, analysis) {
  * レポートシートのヘッダーを確認・作成
  */
 async function ensureReportHeaders(token, spreadsheetId, sheetName) {
-    const range = `${sheetName}!A1:L1`;
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const range = `'${sheetName}'!A1:L1`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
 
     try {
         const response = await fetch(url, {
@@ -760,7 +808,301 @@ async function ensureReportHeaders(token, spreadsheetId, sheetName) {
             'AI余地件数', 'AI活用率(%)', 'AI分析レポート'
         ]];
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:L1?valueInputOption=RAW`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:L1?valueInputOption=RAW`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values: headers })
+        });
+    }
+}
+
+// ========================================
+// Wizard Reports シート保存 (ウィザード連携)
+// ========================================
+
+/**
+ * ウィザードの日報テキストをスプレッドシートに保存
+ * @param {string} token アクセストークン
+ * @param {string} userEmail ユーザーメールアドレス
+ * @param {string} reportText 日報テキスト
+ * @returns {Promise<Object>} 保存結果
+ */
+export async function saveWizardReportToSheet(token, userEmail, reportText) {
+    const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
+
+    if (!spreadsheetId) {
+        throw new Error('スプレッドシートIDが設定されていません');
+    }
+
+    const sheetName = 'WizardReports';
+
+    // ヘッダー確認・作成
+    await ensureWizardReportHeaders(token, spreadsheetId, sheetName);
+
+    // レポート行を作成
+    const row = [
+        new Date().toISOString(),                                   // 送信日時
+        userEmail || 'unknown',                                     // ユーザーメール
+        reportText                                                  // 日報テキスト
+    ];
+
+    // シートに追加
+    const range = `'${sheetName}'!A:C`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
+
+    await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ values: [row] })
+    });
+
+    return { success: true };
+}
+
+// ========================================
+// AI Impact Log シート保存 (ウィザード連携)
+// ========================================
+
+/**
+ * AI活用実績（インパクト等）を構造化データとして保存
+ * @param {string} token アクセストークン
+ * @param {string} userEmail ユーザーメールアドレス
+ * @param {Array} aiUsageData AI活用データの配列
+ * @param {string} valueCreation 価値創造アクション
+ * @returns {Promise<Object>} 保存結果
+ */
+export async function saveAiImpactLog(token, userEmail, aiUsageData, valueCreation) {
+    const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
+
+    if (!spreadsheetId) {
+        throw new Error('スプレッドシートIDが設定されていません');
+    }
+
+    const sheetName = 'AiImpactLog';
+
+    // ヘッダー確認・作成
+    await ensureAiImpactHeaders(token, spreadsheetId, sheetName);
+
+    // AI活用したタスク（used === true）のみ抽出して行データを作成
+    const rows = aiUsageData.filter(a => a.used).map(a => {
+        return [
+            new Date().toISOString(),                                   // 日時
+            userEmail || 'unknown',                                     // ユーザー
+            a.task || '',                                               // タスク名
+            a.tool || '',                                               // 使用ツール
+            a.oneliner || '',                                           // 一言
+            a.impactScore ? a.impactScore.toString() : '',              // インパクトスコア(1-5)
+            a.timeSaved ? a.timeSaved.toString() : '',                  // 短縮時間(分)
+            valueCreation || ''                                         // 価値創造アクション
+        ];
+    });
+
+    if (rows.length === 0) {
+        return { success: true, message: 'no_ai_usage' };
+    }
+
+    // シートに追加
+    const range = `'${sheetName}'!A:H`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
+
+    await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ values: rows })
+    });
+
+    return { success: true, count: rows.length };
+}
+
+/**
+ * WizardReportsシートのヘッダーを確認・作成
+ */
+async function ensureWizardReportHeaders(token, spreadsheetId, sheetName) {
+    const range = `'${sheetName}'!A1:C1`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
+
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            await createSheet(token, spreadsheetId, sheetName);
+        }
+
+        const data = await response.json();
+
+        if (!data.values || data.values.length === 0) {
+            const headers = [['送信日時', 'ユーザーメール', '日報テキスト']];
+
+            await fetch(`${url}?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: headers })
+            });
+        }
+    } catch (error) {
+        await createSheet(token, spreadsheetId, sheetName);
+
+        const headers = [['送信日時', 'ユーザーメール', '日報テキスト']];
+
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:C1?valueInputOption=RAW`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values: headers })
+        });
+    }
+}
+
+/**
+ * AiImpactLogシートのヘッダーを確認・作成
+ */
+async function ensureAiImpactHeaders(token, spreadsheetId, sheetName) {
+    const range = `'${sheetName}'!A1:H1`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
+
+    const headers = [['日時', 'ユーザー', 'タスク名', '使用ツール', '一言', 'インパクトスコア(1-5)', '短縮時間(分)', '価値創造アクション']];
+
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            await createSheet(token, spreadsheetId, sheetName);
+        }
+
+        const data = await response.json();
+
+        if (!data.values || data.values.length === 0) {
+            await fetch(`${url}?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: headers })
+            });
+        }
+    } catch (error) {
+        await createSheet(token, spreadsheetId, sheetName);
+
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:H1?valueInputOption=RAW`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values: headers })
+        });
+    }
+}
+
+// ========================================
+// Decision Log シート保存 (判断の記録)
+// ========================================
+
+/**
+ * 判断ログをスプレッドシートに保存
+ * @param {string} token アクセストークン
+ * @param {string} userEmail ユーザーメールアドレス
+ * @param {Array} decisions 判断データの配列 [{task, tags[], memo}]
+ * @returns {Promise<Object>} 保存結果
+ */
+export async function saveDecisionLog(token, userEmail, decisions) {
+    const { spreadsheetId } = await chrome.storage.local.get(['spreadsheetId']);
+
+    if (!spreadsheetId) {
+        throw new Error('スプレッドシートIDが設定されていません');
+    }
+
+    const sheetName = 'DecisionLog';
+
+    // ヘッダー確認・作成
+    await ensureDecisionLogHeaders(token, spreadsheetId, sheetName);
+
+    // 行データを作成
+    const rows = decisions.map(d => {
+        return [
+            new Date().toISOString(),              // 日時
+            userEmail || 'unknown',                 // ユーザー
+            d.task || '',                           // 予定名
+            (d.tags || []).join(', '),               // 判断タグ（カンマ区切り）
+            d.memo || '',                           // 一言メモ
+        ];
+    });
+
+    if (rows.length === 0) {
+        return { success: true, message: 'no_decisions' };
+    }
+
+    // シートに追加
+    const range = `'${sheetName}'!A:E`;
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`;
+
+    await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ values: rows })
+    });
+
+    return { success: true, count: rows.length };
+}
+
+/**
+ * DecisionLogシートのヘッダーを確認・作成
+ */
+async function ensureDecisionLogHeaders(token, spreadsheetId, sheetName) {
+    const headers = [['日時', 'ユーザー', '予定名', '判断タグ', '一言メモ']];
+
+    try {
+        const res = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:E1`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        if (!res.ok) {
+            throw new Error('Sheet not found');
+        }
+
+        const data = await res.json();
+        if (!data.values || data.values.length === 0) {
+            await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:E1?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ values: headers })
+            });
+        }
+    } catch (error) {
+        await createSheet(token, spreadsheetId, sheetName);
+
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:E1?valueInputOption=RAW`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`,

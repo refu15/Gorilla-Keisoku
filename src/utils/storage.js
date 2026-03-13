@@ -1,38 +1,46 @@
 // Chrome Storage ユーティリティモジュール
 
 /**
- * ユーザー設定を保存
- * @param {Object} settings 設定オブジェクト
- * @returns {Promise<void>}
- */
-export async function saveSettings(settings) {
-    await chrome.storage.sync.set({ userSettings: settings });
-}
-
-/**
- * ユーザー設定を取得
- * @returns {Promise<Object>} 設定オブジェクト
- */
-export async function getSettings() {
-    const { userSettings = {} } = await chrome.storage.sync.get('userSettings');
-    return {
-        // デフォルト設定
-        autoEstimate: true,
-        showConfidence: true,
-        defaultIncludeInReport: true,
-        ...userSettings
-    };
-}
-
-/**
  * 日報下書きを保存
  * @param {string} date 日付（YYYY-MM-DD）
  * @param {Object} draft 下書きデータ
  * @returns {Promise<void>}
  */
 export async function saveDraft(date, draft) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        console.error('saveDraft: 不正な日付形式:', date);
+        return;
+    }
     const key = `draft_${date}`;
     await chrome.storage.local.set({ [key]: draft });
+
+    // 保存のついでに古い下書き（7日以上前のもの）をクリーンアップ
+    cleanupOldDrafts().catch(e => console.warn('下書きクリーンアップエラー:', e));
+}
+
+/**
+ * 7日以上前の古い下書きを自動削除する
+ * ストレージ容量の逼迫を防ぐための安全装置
+ */
+async function cleanupOldDrafts() {
+    const data = await chrome.storage.local.get(null);
+    const keysToRemove = [];
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+    for (const key of Object.keys(data)) {
+        if (key.startsWith('draft_')) {
+            const dateStr = key.replace('draft_', '');
+            const draftDate = new Date(dateStr).getTime();
+            if (!isNaN(draftDate) && (now - draftDate > SEVEN_DAYS)) {
+                keysToRemove.push(key);
+            }
+        }
+    }
+
+    if (keysToRemove.length > 0) {
+        await chrome.storage.local.remove(keysToRemove);
+    }
 }
 
 /**
@@ -41,6 +49,10 @@ export async function saveDraft(date, draft) {
  * @returns {Promise<Object|null>} 下書きデータ
  */
 export async function getDraft(date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        console.error('getDraft: 不正な日付形式:', date);
+        return null;
+    }
     const key = `draft_${date}`;
     const result = await chrome.storage.local.get(key);
     return result[key] || null;
@@ -52,6 +64,10 @@ export async function getDraft(date) {
  * @returns {Promise<void>}
  */
 export async function deleteDraft(date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        console.error('deleteDraft: 不正な日付形式:', date);
+        return;
+    }
     const key = `draft_${date}`;
     await chrome.storage.local.remove(key);
 }
@@ -63,33 +79,6 @@ export async function deleteDraft(date) {
  */
 export async function saveUserInfo(userInfo) {
     await chrome.storage.local.set({ userInfo });
-}
-
-/**
- * ユーザー情報を取得
- * @returns {Promise<Object|null>} ユーザー情報
- */
-export async function getUserInfo() {
-    const { userInfo } = await chrome.storage.local.get('userInfo');
-    return userInfo || null;
-}
-
-/**
- * 最後に送信した日付を保存
- * @param {string} date 日付（YYYY-MM-DD）
- * @returns {Promise<void>}
- */
-export async function saveLastSubmittedDate(date) {
-    await chrome.storage.local.set({ lastSubmittedDate: date });
-}
-
-/**
- * 最後に送信した日付を取得
- * @returns {Promise<string|null>} 日付
- */
-export async function getLastSubmittedDate() {
-    const { lastSubmittedDate } = await chrome.storage.local.get('lastSubmittedDate');
-    return lastSubmittedDate || null;
 }
 
 /**

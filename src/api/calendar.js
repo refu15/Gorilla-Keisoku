@@ -22,7 +22,7 @@ export async function getEventsForDate(token, date) {
     });
 
     // 選択されたカレンダーを取得
-    const { selectedCalendars } = await chrome.storage.sync.get(['selectedCalendars']);
+    const { selectedCalendars } = await chrome.storage.local.get(['selectedCalendars']);
 
     // カレンダー一覧を取得
     const calendars = await getCalendarList(token);
@@ -88,7 +88,7 @@ export async function getCalendarList(token) {
  * @param {Array<string>} calendarIds 選択されたカレンダーID
  */
 export async function saveSelectedCalendars(calendarIds) {
-    await chrome.storage.sync.set({ selectedCalendars: calendarIds });
+    await chrome.storage.local.set({ selectedCalendars: calendarIds });
 }
 
 /**
@@ -96,7 +96,7 @@ export async function saveSelectedCalendars(calendarIds) {
  * @returns {Promise<Array<string>>} 選択されたカレンダーID
  */
 export async function getSelectedCalendars() {
-    const { selectedCalendars } = await chrome.storage.sync.get(['selectedCalendars']);
+    const { selectedCalendars } = await chrome.storage.local.get(['selectedCalendars']);
     return selectedCalendars || [];
 }
 
@@ -133,7 +133,7 @@ async function fetchCalendarEvents(token, calendarId, params) {
 export function getEventDuration(event) {
     const start = new Date(event.start.dateTime || event.start.date);
     const end = new Date(event.end.dateTime || event.end.date);
-    return Math.round((end - start) / (1000 * 60));
+    return Math.max(0, Math.round((end - start) / (1000 * 60)));
 }
 
 /**
@@ -161,6 +161,7 @@ export function calculateTotalWorkTime(events) {
  * @returns {string} X時間Y分形式
  */
 export function formatDuration(minutes) {
+    if (!minutes || minutes <= 0) return '0分';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (hours === 0) {
