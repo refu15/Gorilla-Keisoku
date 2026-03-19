@@ -224,6 +224,18 @@ let currentStep = 1;
 let authTokenRef = null;
 let el = {};
 
+async function loadGoalsHistory() {
+    const { wizardSkillsGoal = '', wizardMindGoal = '' } = await chrome.storage.local.get(['wizardSkillsGoal', 'wizardMindGoal']);
+    return { skillsGoal: wizardSkillsGoal, mindGoal: wizardMindGoal };
+}
+
+async function saveGoalsHistory(skillsGoal, mindGoal) {
+    await chrome.storage.local.set({
+        wizardSkillsGoal: skillsGoal || '',
+        wizardMindGoal: mindGoal || ''
+    });
+}
+
 // ===== 初期化 =====
 export function initWizard(token) {
     authTokenRef = token;
@@ -341,14 +353,17 @@ async function loadInsightHistory() {
 
 // ===== ウィザード開始 =====
 export async function startWizard(passedEvents, passedScheduleData) {
+    const goals = await loadGoalsHistory();
     wizardState = {
         sessionGeneratedOneliners: [],
         rawEvents: passedEvents, scheduleData: passedScheduleData,
         events: [], additionalTasks: '', pendingTasks: [],
         actionItems: [], aiUsage: [], aiCurrentIdx: 0,
         decisions: [],
+        skillsGoal: goals.skillsGoal, mindGoal: goals.mindGoal,
         insightPurpose: '', insightResult: '', valueCreation: '',
         tryAndImprove: '', otherNotes: '',
+        polishedSkills: '', polishedMindset: '', polishedGyaru: '',
         tomorrowEvents: [], tomorrowAdditional: '',
         _tomorrowTaskItems: [],
         schedule: [], finalReport: '',
@@ -1063,39 +1078,61 @@ function confirmStep3Decision() {
 // ===== STEP 3: 気づき・学び（目的×結果ペア + AI校正） =====
 async function renderStep3() {
     setContent(`
-      <p class="wizard-step-title">💡 得られた気づき・学び</p>
-      <p class="wizard-step-sub">「目的」と「結果」をセットで入力してください。雑な内容でもOK — AIが補完・校正します。</p>
+      <p class="wizard-step-title">💡 今日の目標と気づき・学び</p>
+      <p class="wizard-step-sub">今日の目標（スキル・マインド）と、一番大きな学び（目的・結果）を入力してください。<br>雑な内容でもOK—AIが「ギャルヒアリング日報Gem」として補完・校正します💅</p>
 
       <div class="form-group wizard-mt-sm">
-        <label class="wizard-sublabel">📌 目的（何のために行ったか）</label>
-        <textarea class="wizard-textarea" id="wizard-insight-purpose" placeholder="例：チーム内の情報共有のためにMTGを実施" rows="3">${escapeHtml(wizardState.insightPurpose || '')}</textarea>
+        <label class="wizard-sublabel">🎯 スキル目標（前回の内容を復元）</label>
+        <textarea class="wizard-textarea" id="wizard-skills-goal" placeholder="例：議事録作成スピードを上げる" rows="2">${escapeHtml(wizardState.skillsGoal || '')}</textarea>
       </div>
 
       <div class="form-group wizard-mt-sm">
-        <label class="wizard-sublabel">📝 結果（何がわかった・得られたか）</label>
-        <textarea class="wizard-textarea" id="wizard-insight-result" placeholder="例：来週までにやることが明確になった" rows="3">${escapeHtml(wizardState.insightResult || '')}</textarea>
+        <label class="wizard-sublabel">❤️ マインド目標（前回の内容を復元）</label>
+        <textarea class="wizard-textarea" id="wizard-mind-goal" placeholder="例：常に目的思考で取り組む" rows="2">${escapeHtml(wizardState.mindGoal || '')}</textarea>
       </div>
 
       <div class="form-group wizard-mt-sm">
-        <label class="wizard-sublabel">🚀 価値創造アクション（AIで浮いた時間で何をしたか）</label>
-        <textarea class="wizard-textarea" id="wizard-value-creation" placeholder="例：浮いた時間でクライアントへの追加提案資料を作成できた" rows="3">${escapeHtml(wizardState.valueCreation || '')}</textarea>
+        <label class="wizard-sublabel">📌 今日のハイライト：目的（何のために行ったか）</label>
+        <textarea class="wizard-textarea" id="wizard-insight-purpose" placeholder="例：チーム内の情報共有のためにMTGを実施" rows="2">${escapeHtml(wizardState.insightPurpose || '')}</textarea>
+      </div>
+
+      <div class="form-group wizard-mt-sm">
+        <label class="wizard-sublabel">📝 今日のハイライト：結果（何がわかった・得られたか）</label>
+        <textarea class="wizard-textarea" id="wizard-insight-result" placeholder="例：来週までにやることが明確になった" rows="2">${escapeHtml(wizardState.insightResult || '')}</textarea>
+      </div>
+
+      <div class="form-group wizard-mt-sm">
+        <label class="wizard-sublabel">🚀 価値創造アクション（AIで浮いた時間等で何をしたか）</label>
+        <textarea class="wizard-textarea" id="wizard-value-creation" placeholder="例：浮いた時間でクライアントへの追加提案資料を作成できた" rows="2">${escapeHtml(wizardState.valueCreation || '')}</textarea>
       </div>
 
       <div class="wizard-choices wizard-mt-sm">
-        <button class="wizard-choice-btn wizard-choice-btn--primary" id="wizard-ai-polish-btn">🪄 AIで補完・校正</button>
+        <button class="wizard-choice-btn wizard-choice-btn--primary" id="wizard-ai-polish-btn">🪄 AIで補完・校正（ギャルGem起動💅）</button>
       </div>
 
       <div id="wizard-ai-polish-result" class="hidden wizard-mt-sm">
         <label class="wizard-sublabel">✨ AI校正結果</label>
         <div class="form-group">
-          <label class="wizard-sublabel"><small>📌 校正後の目的</small></label>
-          <textarea class="wizard-textarea" id="wizard-polished-purpose" rows="3"></textarea>
+          <label class="wizard-sublabel"><small>🎯 校正後のスキル目標</small></label>
+          <textarea class="wizard-textarea" id="wizard-polished-skills" rows="2"></textarea>
         </div>
         <div class="form-group wizard-mt-sm">
-          <label class="wizard-sublabel"><small>📝 校正後の結果</small></label>
-          <textarea class="wizard-textarea" id="wizard-polished-result" rows="3"></textarea>
+          <label class="wizard-sublabel"><small>❤️ 校正後のマインド目標</small></label>
+          <textarea class="wizard-textarea" id="wizard-polished-mindset" rows="2"></textarea>
         </div>
-        <p class="wizard-hint">校正結果を自由に編集できます。OKを押すと次のステップへ進みます。</p>
+        <div class="form-group wizard-mt-sm">
+          <label class="wizard-sublabel"><small>📌 校正後の目的</small></label>
+          <textarea class="wizard-textarea" id="wizard-polished-purpose" rows="2"></textarea>
+        </div>
+        <div class="form-group wizard-mt-sm">
+          <label class="wizard-sublabel"><small>📝 校正後の結果とネクストアクション（気づき・価値観含む）</small></label>
+          <textarea class="wizard-textarea" id="wizard-polished-result" rows="4"></textarea>
+        </div>
+        <div class="form-group wizard-mt-sm">
+          <label class="wizard-sublabel"><small>🎀 ギャルのひとことコーチング</small></label>
+          <textarea class="wizard-textarea" id="wizard-polished-gyaru" rows="3" disabled style="background:#fdf4ff; border-color:#e879f9; color:#a21caf;"></textarea>
+        </div>
+        <p class="wizard-hint">校正結果を自由に編集できます（ギャル語は編集不可）。OKを押すと次のステップへ進みます。</p>
       </div>
     `);
     el.okBtn.disabled = false;
@@ -1104,17 +1141,22 @@ async function renderStep3() {
     document.getElementById('wizard-ai-polish-btn').addEventListener('click', async () => {
         const purposeEl = document.getElementById('wizard-insight-purpose');
         const resultEl = document.getElementById('wizard-insight-result');
+        const skillsEl = document.getElementById('wizard-skills-goal');
+        const mindEl = document.getElementById('wizard-mind-goal');
+        
         const rawPurpose = purposeEl.value.trim();
         const rawResult = resultEl.value.trim();
+        const rawSkills = skillsEl.value.trim();
+        const rawMind = mindEl.value.trim();
 
-        if (!rawPurpose && !rawResult) {
-            showInlineError('目的または結果を入力してからAI校正を実行してください');
+        if (!rawPurpose && !rawResult && !rawSkills && !rawMind) {
+            showInlineError('目標や目的・結果のいずれかを入力してからAI校正を実行してください');
             return;
         }
 
         const btn = document.getElementById('wizard-ai-polish-btn');
         btn.disabled = true;
-        btn.textContent = '🔄 AI校正中...';
+        btn.textContent = '🔄 ギャル思考中...';
 
         const actionSummary = wizardState.actionItems.map(a => `・${sanitizeForPrompt(a.title)}`).join('\n');
         const history = await loadInsightHistory();
@@ -1124,21 +1166,34 @@ async function renderStep3() {
             `\n上記の文章スタイルを参考にしてください。`
             : '';
 
-        const prompt = `あなたは日報の「気づき・学び」セクションを校正するアシスタントです。
-ユーザーが雑に入力した「目的」と「結果」を、ビジネス日報にふさわしい自然な文章に補完・校正してください。
-意味は変えずに、わかりやすく簡潔な文章にしてください。${historySection}
+        const prompt = `あなたは「ギャルヒアリング日報Gem」です。
+ユーザーが雑に入力した「スキル目標」「マインド目標」「目的」「結果」を、ビジネス日報にふさわしい自然な文章（「です・ます」調）に補完・校正してください。具体性（数字や固有名詞）は保持してください。
+また、結果から「磨かれたスキル」や「発揮された価値観」などの気づきやネクストアクションも抽出して 'result' 内に箇条書きで含めてください。
+さらに、一番最後にはユーザーの振り返りに対して、テンション高めのギャル語で共感し、問いかける内容（断定・指示NG）を生成してください。
 
 【今日の業務一覧（参考）】
 ${actionSummary}
 
-【ユーザー入力 - 目的】
-${sanitizeForPrompt(rawPurpose, 300) || '（未入力）'}
+【ユーザー入力 - スキル目標】
+${sanitizeForPrompt(rawSkills, 300) || '（未入力：業務内容から推測）'}
 
-【ユーザー入力 - 結果】
-${sanitizeForPrompt(rawResult, 300) || '（未入力）'}
+【ユーザー入力 - マインド目標】
+${sanitizeForPrompt(rawMind, 300) || '（未入力：業務内容から推測）'}
+
+【ユーザー入力 - 目的（ハイライト業務）】
+${sanitizeForPrompt(rawPurpose, 300) || '（未入力：業務内容から推測）'}
+
+【ユーザー入力 - 結果（ハイライト業務）】
+${sanitizeForPrompt(rawResult, 300) || '（未入力：業務内容から推測）'}
 
 以下のJSON形式で返してください：
-{"purpose": "校正された目的の文章", "result": "校正された結果の文章"}
+{
+  "skills": "校正されたスキル目標",
+  "mindset": "校正されたマインド目標",
+  "purpose": "校正された目的の文章",
+  "result": "校正された結果と気づき・ネクストアクション（箇条書きも可）の文章",
+  "gyaru_coaching": "ギャルのひとことコーチング"
+}
 JSONのみ返してください。`;
 
         try {
@@ -1149,8 +1204,11 @@ JSONのみ返してください。`;
                 if (parsed.purpose && parsed.result) {
                     const resultArea = document.getElementById('wizard-ai-polish-result');
                     resultArea.classList.remove('hidden');
-                    document.getElementById('wizard-polished-purpose').value = parsed.purpose;
-                    document.getElementById('wizard-polished-result').value = parsed.result;
+                    document.getElementById('wizard-polished-skills').value = parsed.skills || rawSkills;
+                    document.getElementById('wizard-polished-mindset').value = parsed.mindset || rawMind;
+                    document.getElementById('wizard-polished-purpose').value = parsed.purpose || rawPurpose;
+                    document.getElementById('wizard-polished-result').value = parsed.result || rawResult;
+                    document.getElementById('wizard-polished-gyaru').value = parsed.gyaru_coaching || '';
                 } else {
                     showInlineError('AI校正結果の解析に失敗しました。手動で編集してください。');
                 }
@@ -1163,29 +1221,42 @@ JSONのみ返してください。`;
         }
 
         btn.disabled = false;
-        btn.textContent = '🪄 AIで補完・校正';
+        btn.textContent = '🪄 AIで補完・校正（ギャルGem起動💅）';
     });
 }
 
 function confirmStep3() {
-    // 校正結果が表示されている場合はそちらを優先
     const polishedArea = document.getElementById('wizard-ai-polish-result');
-    let purpose, result;
+    let purpose, result, skills, mind, gyaru;
+    
     if (polishedArea && !polishedArea.classList.contains('hidden')) {
+        skills = document.getElementById('wizard-polished-skills')?.value.trim() || '';
+        mind = document.getElementById('wizard-polished-mindset')?.value.trim() || '';
         purpose = document.getElementById('wizard-polished-purpose')?.value.trim() || '';
         result = document.getElementById('wizard-polished-result')?.value.trim() || '';
+        gyaru = document.getElementById('wizard-polished-gyaru')?.value.trim() || '';
     } else {
+        skills = document.getElementById('wizard-skills-goal')?.value.trim() || '';
+        mind = document.getElementById('wizard-mind-goal')?.value.trim() || '';
         purpose = document.getElementById('wizard-insight-purpose')?.value.trim() || '';
         result = document.getElementById('wizard-insight-result')?.value.trim() || '';
+        gyaru = '';
     }
 
-    if (!purpose && !result) {
-        showInlineError('目的または結果を入力してください');
+    if (!purpose && !result && !skills && !mind) {
+        showInlineError('目標や目的・結果のいずれかを入力してください');
         return false;
     }
+    
+    wizardState.skillsGoal = skills;
+    wizardState.mindGoal = mind;
     wizardState.insightPurpose = purpose;
     wizardState.insightResult = result;
+    wizardState.polishedGyaru = gyaru;
     wizardState.valueCreation = document.getElementById('wizard-value-creation')?.value.trim() || '';
+    
+    // スキルとマインドをストレージに保存（次回以降復元するため）
+    saveGoalsHistory(skills, mind);
     // 学習のために保存
     saveInsightHistory(purpose, result);
     return true;
@@ -1379,21 +1450,46 @@ function buildSchedule(existingEvents, taskItems, autoSchedule = true) {
 function renderFinal() {
     currentStep = 8;
     updateIndicator(8); updateStepLabel(8);
-    const actionSection = wizardState.actionItems.map(a => `* ${a.title}`).join('\n');
+    const actionSection = wizardState.actionItems.map(a => `- ${a.title}`).join('\n');
     const aiSection = wizardState.aiUsage.filter(a => a.used === 'yes' || a.used === true || a.used === 'failed').map(a => {
-        let text = `* 業務名：${a.task}\n  * ツール：${a.tool || '—'}\n  * 一言：${a.oneliner || '—'}`;
+        let text = `- **業務名：** ${a.task}\n  **ツール：** ${a.tool || '—'}\n  **一言：** ${a.oneliner || '—'}`;
         if (a.used === 'failed') {
-            text += `\n  * ⚠️ 活用結果：うまくいかなかった\n  * 課題・理由：${a.note || '—'}`;
+            text += `\n  **⚠️ 活用結果：うまく機能しなかった**\n  **課題・理由：** ${a.note || '—'}`;
         } else {
-            if (a.impactScore) text += `\n  * インパクト：Lv${a.impactScore}`;
-            if (a.timeSaved) text += `\n  * 短縮時間：${a.timeSaved}分`;
+            if (a.impactScore) text += `\n  **インパクト：** Lv${a.impactScore}`;
+            if (a.timeSaved) text += `\n  **短縮時間：** ${a.timeSaved}分`;
         }
         return text;
     }).join('\n\n');
-    const scheduleSection = wizardState.schedule.map(s => `* ${s.title}（${formatTime(s.start?.toISOString())} - ${formatTime(s.end?.toISOString())}）`).join('\n');
-    let insightSection = `【目的】${wizardState.insightPurpose || '—'}\n【結果】${wizardState.insightResult || '—'}`;
-    if (wizardState.valueCreation) insightSection += `\n【価値創造】${wizardState.valueCreation}`;
-    const report = `◾️具体的な行動内容\n\n1) 具体的な行動内容\n${actionSection}\n\n2) AI活用した行動内容\n${aiSection || '（なし）'}\n\n◾️得られた気づき・学び\n\n${insightSection}\n\n◾️明日挑戦したいこと・改善したいこと\n\n${wizardState.tryAndImprove || '（なし）'}\n\n◾️翌日予定\n\n${scheduleSection}${wizardState.otherNotes ? `\n\n◾️その他共有事項\n\n${wizardState.otherNotes}` : ''}`;
+    const scheduleSection = wizardState.schedule.map(s => `- ${s.title}（${formatTime(s.start?.toISOString())} - ${formatTime(s.end?.toISOString())}）`).join('\n');
+    
+    let insightSection = `**目的（Why）：**\n${wizardState.insightPurpose || '—'}\n\n**結果（Outcome）：**\n${wizardState.insightResult || '—'}`;
+    if (wizardState.valueCreation) insightSection += `\n\n**価値創造：**\n${wizardState.valueCreation}`;
+    
+    const gyaruSection = wizardState.polishedGyaru ? `\n\n## 🎀ギャルのひとことコーチング\n${wizardState.polishedGyaru}` : '';
+    
+    const report = `## ◾️スキル目標
+${wizardState.skillsGoal || '未設定'}
+
+## ◾️マインド目標
+${wizardState.mindGoal || '未設定'}
+
+## ◾️具体的な行動内容
+### 1) 具体的な行動内容
+${actionSection}
+
+### 2) AI活用した行動内容
+${aiSection || '特になし'}
+
+## ◾️得られた気づき・学び（ピックアップ：今日のハイライト案件名）
+${insightSection}
+
+## ◾️明日挑戦したいこと・改善したいこと
+- ${wizardState.tryAndImprove || '特になし'}
+
+## ◾️翌日予定
+${scheduleSection}${wizardState.otherNotes ? `\n\n## ◾️その他共有事項\n${wizardState.otherNotes}` : ''}${gyaruSection}`;
+    
     wizardState.finalReport = report;
 
     const hasNewItems = wizardState.schedule.some(s => s.isNew);
